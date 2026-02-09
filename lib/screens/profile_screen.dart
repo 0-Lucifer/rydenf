@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_service.dart';
+import '../services/auth_gate.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -28,7 +30,15 @@ class ProfileScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () async {
+              await AuthService.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const AuthGate()),
+                  (route) => false,
+                );
+              }
+            },
             icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 22),
           ),
           const SizedBox(width: 8),

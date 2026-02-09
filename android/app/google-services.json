@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "318410227659",
+    "project_id": "ryden-2",
+    "storage_bucket": "ryden-2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:318410227659:android:fe0e3ab21f97d2a820404e",
+        "android_client_info": {
+          "package_name": "com.example.ryden"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDk1s5IbMw_MqwAptGqVm9Nx8Hi8qlizjg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

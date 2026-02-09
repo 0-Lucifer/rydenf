@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
-import 'screens/login_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'services/auth_gate.dart';
 
-void main() => runApp(const RydenApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(const RydenApp());
+}
 
 class RydenApp extends StatelessWidget {
   const RydenApp({super.key});
@@ -15,7 +23,7 @@ class RydenApp extends StatelessWidget {
         useMaterial3: true,
         appBarTheme: const AppBarTheme(elevation: 0, backgroundColor: Colors.transparent),
       ),
-      home: const LoginScreen(),
+      home: const AuthGate(),
     );
   }
 }
