@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/home_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/trips_screen.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -14,7 +15,7 @@ class _MainWrapperState extends State<MainWrapper> {
 
   final List<Widget> _pages = [
     const RydenHome(),
-    const Center(child: Text("Trips Page")),
+    const TripsScreen(),
     const Center(child: Text("Inbox Page")),
     const ProfileScreen(),
   ];
