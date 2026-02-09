@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_service.dart';
 import '../widgets/main_wrapper.dart';
 import 'signup_screen.dart';
+import 'email_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,7 +14,79 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final result = await AuthService.signIn(
+      email: _emailController.text,
+      password: _passwordController.text,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (!mounted) return;
+
+    if (result.success) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainWrapper()),
+        (route) => false,
+      );
+    } else if (result.needsVerification) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const EmailVerificationScreen()),
+      );
+    } else {
+      _showSnackBar(result.message, isError: true);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      _showSnackBar('Please enter your email address first.', isError: true);
+      return;
+    }
+
+    if (!AuthService.isValidUniversityEmail(email)) {
+      _showSnackBar('Only @northsouth.edu emails are allowed.', isError: true);
+      return;
+    }
+
+    final result = await AuthService.sendPasswordReset(email);
+    if (mounted) {
+      _showSnackBar(result.message, isError: !result.success);
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
+        backgroundColor: isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,50 +103,187 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       "Login to your account",
-                      style: TextStyle(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFF2D3142),
+                        color: const Color(0xFF2D3142),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      "Welcome back! Please enter your details.",
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                    Text(
+                      "Welcome back! Please enter your NSU credentials.",
+                      style: GoogleFonts.plusJakartaSans(
+                        color: const Color(0xFF64748B),
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 40),
-                    _buildTextField(
-                      label: "Email or Phone",
-                      hint: "2212302642",
-                      icon: Icons.person_outline_rounded,
+
+                    // Email Field
+                    _buildLabel("University Email"),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w600),
+                      decoration: _inputDecoration(
+                        hint: "name@northsouth.edu",
+                        icon: Icons.email_outlined,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        if (!AuthService.isValidUniversityEmail(value)) {
+                          return 'Only @northsouth.edu emails are allowed';
+                        }
+                        return null;
+                      },
                     ),
-                    const SizedBox(height: 20),
-                    _buildTextField(
-                      label: "Password",
-                      hint: "••••••••",
-                      icon: Icons.lock_outline_rounded,
-                      isPassword: true,
+                    const SizedBox(height: 22),
+
+                    // Password Field
+                    _buildLabel("Password"),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w600),
+                      decoration: _inputDecoration(
+                        hint: "••••••••",
+                        icon: Icons.lock_outline_rounded,
+                      ).copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                            color: const Color(0xFF94A3B8),
+                            size: 20,
+                          ),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        if (value.length < 6) {
+                          return 'Password must be at least 6 characters';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
+
+                    // Forgot Password
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
-                        child: const Text(
+                        onPressed: _forgotPassword,
+                        child: Text(
                           "Forgot Password?",
-                          style: TextStyle(
-                            color: Color(0xFF2E7CF6),
-                            fontWeight: FontWeight.bold,
+                          style: GoogleFonts.plusJakartaSans(
+                            color: const Color(0xFF2E7CF6),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 30),
-                    _buildLoginButton(),
-                    const SizedBox(height: 40),
-                    _buildSignUpOption(),
+                    const SizedBox(height: 25),
+
+                    // Login Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7CF6),
+                          disabledBackgroundColor: const Color(0xFF2E7CF6).withOpacity(0.6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : Text(
+                                "LOGIN",
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // NSU badge
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.verified_user_outlined, size: 16, color: Color(0xFF10B981)),
+                            const SizedBox(width: 6),
+                            Text(
+                              "NSU Students Only",
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF10B981),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 35),
+
+                    // Sign Up Option
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Don't have an account? ",
+                          style: GoogleFonts.plusJakartaSans(
+                            color: const Color(0xFF64748B),
+                            fontSize: 14,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SignUpScreen()),
+                            );
+                          },
+                          child: Text(
+                            "Sign Up",
+                            style: GoogleFonts.plusJakartaSans(
+                              color: const Color(0xFF2E7CF6),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -116,104 +328,41 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField({
-    required String label,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF4F7F9),
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: TextFormField(
-            obscureText: isPassword && _obscurePassword,
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-              prefixIcon: Icon(icon, color: const Color(0xFF2E7CF6), size: 20),
-              suffixIcon: isPassword
-                  ? IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: Colors.grey,
-                      ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    )
-                  : null,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoginButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 55,
-      child: ElevatedButton(
-        onPressed: () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const MainWrapper()),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF2E7CF6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          elevation: 5,
-          shadowColor: const Color(0xFF2E7CF6).withOpacity(0.4),
-        ),
-        child: const Text(
-          "LOGIN",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-        ),
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
+      style: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+        color: const Color(0xFF334155),
       ),
     );
   }
 
-  Widget _buildSignUpOption() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text(
-          "Don't have an account? ",
-          style: TextStyle(color: Colors.grey),
-        ),
-        GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SignUpScreen()),
-            );
-          },
-          child: const Text(
-            "Sign Up",
-            style: TextStyle(
-              color: Color(0xFF2E7CF6),
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
-          ),
-        ),
-      ],
+  InputDecoration _inputDecoration({required String hint, required IconData icon}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.plusJakartaSans(color: const Color(0xFFABB5C0), fontSize: 14),
+      prefixIcon: Icon(icon, color: const Color(0xFF2E7CF6), size: 20),
+      filled: true,
+      fillColor: const Color(0xFFF4F7F9),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: const BorderSide(color: Color(0xFF2E7CF6), width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
     );
   }
 }
