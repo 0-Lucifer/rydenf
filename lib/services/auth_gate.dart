@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/login_screen.dart';
 import '../screens/email_verification_screen.dart';
 import '../widgets/main_wrapper.dart';
+import 'firestore_service.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -31,7 +32,9 @@ class AuthGate extends StatelessWidget {
           return const EmailVerificationScreen();
         }
 
-        // Logged in & verified → go to app
+        // Logged in & verified → ensure profile exists, then go to app
+        // This handles users who signed up before Firestore was integrated
+        FirestoreService.ensureUserProfile();
         return const MainWrapper();
       },
     );
