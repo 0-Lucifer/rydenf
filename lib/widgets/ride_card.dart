@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/ride_model.dart';
+import '../screens/ride_detail_screen.dart';
 
 class RideCard extends StatelessWidget {
   final Ride ride;
@@ -14,7 +15,15 @@ class RideCard extends StatelessWidget {
     final String formattedTime = DateFormat('hh:mm a').format(ride.departureTime);
     const Color kPrimaryBlue = Color(0xFF2E7CF6); // Login page blue
 
-    return Container(
+    return GestureDetector(
+      onTap: () {
+        if (ride.id != null) {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => RideDetailScreen(rideId: ride.id!),
+          ));
+        }
+      },
+      child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -121,6 +130,7 @@ class RideCard extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 
