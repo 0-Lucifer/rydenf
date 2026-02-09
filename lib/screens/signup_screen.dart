@@ -45,6 +45,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final result = await AuthService.signUp(
       email: _emailController.text,
       password: _passwordController.text,
+      displayName: _nameController.text,
+      studentId: _studentIdController.text,
+      phone: _phoneController.text,
+      gender: _selectedGender ?? '',
     );
 
     setState(() => _isLoading = false);

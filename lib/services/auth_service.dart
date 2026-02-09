@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'firestore_service.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -20,6 +21,10 @@ class AuthService {
   static Future<({bool success, String message})> signUp({
     required String email,
     required String password,
+    required String displayName,
+    String studentId = '',
+    String phone = '',
+    String gender = '',
   }) async {
     final trimmedEmail = email.trim().toLowerCase();
 
@@ -36,8 +41,23 @@ class AuthService {
         password: password,
       );
 
+      // Set display name on Firebase Auth user
+      await credential.user?.updateDisplayName(displayName.trim());
+
       // Send verification email
       await credential.user?.sendEmailVerification();
+
+      // Create user profile in Firestore with all fields
+      if (credential.user != null) {
+        await FirestoreService.createUserProfile(
+          uid: credential.user!.uid,
+          email: trimmedEmail,
+          displayName: displayName.trim(),
+          studentId: studentId.trim(),
+          phone: phone.trim(),
+          gender: gender,
+        );
+      }
 
       return (
         success: true,

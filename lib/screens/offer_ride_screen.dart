@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/ride_model.dart';
+import '../services/auth_service.dart';
+import '../services/firestore_service.dart';
 
 enum GenderPreference { both, male, female }
 
@@ -21,6 +23,7 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   bool _instantBooking = true;
+  bool _isPublishing = false;
 
   // Route Management
   final List<TextEditingController> _locations = [
@@ -71,6 +74,82 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
       _locations[index].dispose();
       _locations.removeAt(index);
     });
+  }
+
+  Future<void> _publishRide() async {
+    final origin = _locations.first.text.trim();
+    final destination = _locations.last.text.trim();
+
+    if (origin.isEmpty || destination.isEmpty) {
+      _showSnackBar('Please enter pickup and drop-off locations.', false);
+      return;
+    }
+
+    final uid = AuthService.currentUser?.uid;
+    if (uid == null) {
+      _showSnackBar('Please sign in to publish a ride.', false);
+      return;
+    }
+
+    setState(() => _isPublishing = true);
+
+    // Collect stops (intermediate locations)
+    final stops = <String>[];
+    for (int i = 1; i < _locations.length - 1; i++) {
+      final stop = _locations[i].text.trim();
+      if (stop.isNotEmpty) stops.add(stop);
+    }
+
+    // Build departure DateTime
+    final departure = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _selectedTime.hour,
+      _selectedTime.minute,
+    );
+
+    final driverName = AuthService.currentUser?.email?.split('@').first ?? 'Unknown';
+
+    final ride = Ride(
+      driverId: uid,
+      driverName: driverName,
+      vehicleId: '',
+      vehicleType: _selectedVehicle,
+      vehicleModel: _getVehicleName(_selectedVehicle),
+      origin: origin,
+      destination: destination,
+      stops: stops,
+      departureTime: departure,
+      seatsTotal: _seatsAvailable,
+      seatsAvailable: _seatsAvailable,
+      genderPreference: _genderPreference.name,
+      pricePerSeat: double.tryParse(_priceController.text) ?? 50.0,
+      instantMatch: _instantBooking,
+    );
+
+    final result = await FirestoreService.publishRide(ride);
+
+    setState(() => _isPublishing = false);
+
+    if (mounted) {
+      _showSnackBar(result.message, result.success);
+      if (result.success) {
+        Navigator.pop(context);
+      }
+    }
+  }
+
+  void _showSnackBar(String message, bool success) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: success ? const Color(0xFF10B981) : Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -540,7 +619,7 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
           const SizedBox(width: 16),
           Expanded(
             child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: _isPublishing ? null : _publishRide,
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryColor,
                 foregroundColor: Colors.white,
@@ -548,7 +627,13 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                 elevation: 0,
               ),
-              child: Text("Publish Ride", style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w800)),
+              child: _isPublishing
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : Text("Publish Ride", style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w800)),
             ),
           ),
         ],
