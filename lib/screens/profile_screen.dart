@@ -1,144 +1,233 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import '../services/firestore_service.dart';
 import '../services/auth_gate.dart';
+import '../models/user_model.dart';
+import 'edit_profile_screen.dart';
+import 'my_rides_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    const Color kPrimaryBlue = Color(0xFF2E7CF6);
-    const Color kBackgroundColor = Color(0xFFF8FAFC);
-    const Color kTextPrimary = Color(0xFF0F172A);
-    const Color kTextSecondary = Color(0xFF64748B);
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
 
+class _ProfileScreenState extends State<ProfileScreen> {
+  static const Color kPrimaryBlue = Color(0xFF2E7CF6);
+  static const Color kBackgroundColor = Color(0xFFF8FAFC);
+  static const Color kTextPrimary = Color(0xFF0F172A);
+  static const Color kTextSecondary = Color(0xFF64748B);
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        automaticallyImplyLeading: false,
-        title: Text(
-          "Profile",
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            color: kTextPrimary,
-            fontSize: 18,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () async {
-              await AuthService.signOut();
-              if (context.mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const AuthGate()),
-                  (route) => false,
-                );
-              }
-            },
-            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 22),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: [
-            const SizedBox(height: 30),
-            _buildProfileHeader(kPrimaryBlue, kTextPrimary, kTextSecondary),
-            const SizedBox(height: 30),
-            _buildStudentInfoCard(kPrimaryBlue, kTextPrimary, kTextSecondary),
-            const SizedBox(height: 30),
-            _buildSettingsSection(kPrimaryBlue, kTextPrimary, kTextSecondary),
-            const SizedBox(height: 30),
-            _buildSafetySection(kTextPrimary, kTextSecondary),
-            const SizedBox(height: 120),
-          ],
-        ),
+      body: StreamBuilder<UserProfile?>(
+        stream: FirestoreService.getUserProfileStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: kPrimaryBlue),
+            );
+          }
+
+          final profile = snapshot.data;
+          final displayName = (profile?.displayName.isNotEmpty == true)
+              ? profile!.displayName
+              : (AuthService.currentUser?.email?.split('@').first ?? 'Student');
+          final email = AuthService.currentUser?.email ?? '';
+
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // Gradient header
+              SliverToBoxAdapter(
+                child: _buildGradientHeader(displayName, email, profile),
+              ),
+
+              // Content
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    const SizedBox(height: 20),
+                    _buildStudentInfoCard(profile, email),
+                    const SizedBox(height: 20),
+                    _buildActionsSection(profile),
+                    const SizedBox(height: 20),
+                    _buildSafetySection(),
+                    const SizedBox(height: 20),
+                    _buildLogoutButton(),
+                    const SizedBox(height: 30),
+                  ]),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildProfileHeader(Color primaryColor, Color textPrimary, Color textSecondary) {
-    return Column(
-      children: [
-        Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryColor.withOpacity(0.12),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+  Widget _buildGradientHeader(String displayName, String email, UserProfile? profile) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF2E7CF6), Color(0xFF4AC7FA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(40),
+          bottomRight: Radius.circular(40),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+          child: Column(
+            children: [
+              // Top bar
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "My Account",
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontSize: 20,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      if (profile != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EditProfileScreen(profile: profile),
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
+                    ),
                   ),
                 ],
               ),
-              child: const CircleAvatar(
-                radius: 65,
-                backgroundColor: Color(0xFFE2E8F0),
-                backgroundImage: AssetImage('assets/images/anonto-profile.jpg'),
+              const SizedBox(height: 28),
+
+              // Avatar
+              Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.5), width: 4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 55,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      child: Text(
+                        displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 42,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.verified_rounded,
+                        color: Color(0xFF10B981),
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            Positioned(
-              bottom: 5,
-              right: 5,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
+              const SizedBox(height: 16),
+
+              // Name
+              Text(
+                displayName,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
                   color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.verified_rounded,
-                  color: Color(0xFF10B981),
-                  size: 28,
+                  letterSpacing: -0.3,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Text(
-          "Anonto Bormon",
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            color: textPrimary,
-            letterSpacing: -0.5,
+              const SizedBox(height: 4),
+              Text(
+                email,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.75),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  "Verified Student",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          "Verified Student",
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: textSecondary,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildStudentInfoCard(Color primaryColor, Color textPrimary, Color textSecondary) {
+  Widget _buildStudentInfoCard(UserProfile? profile, String email) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 20,
-            offset: const Offset(0, 10),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -150,89 +239,139 @@ class ProfileScreen extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              color: textSecondary,
+              color: kTextSecondary,
               letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: 24),
-          _buildInfoRow(Icons.badge_outlined, "Student ID", "2212302642", primaryColor, textPrimary, textSecondary),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 20),
+          _buildInfoRow(Icons.badge_outlined, "Student ID",
+              profile?.studentId.isNotEmpty == true ? profile!.studentId : 'Not set'),
+          _divider(),
+          _buildInfoRow(Icons.school_outlined, "Department",
+              profile?.department.isNotEmpty == true ? profile!.department : 'Not set'),
+          _divider(),
+          _buildInfoRow(Icons.groups_outlined, "Batch",
+              profile?.batch.isNotEmpty == true ? profile!.batch : 'Not set'),
+          _divider(),
+          _buildInfoRow(Icons.phone_outlined, "Phone",
+              profile?.phone.isNotEmpty == true ? profile!.phone : 'Not set'),
+          _divider(),
+          _buildInfoRow(
+            profile?.gender == 'Female' ? Icons.female_rounded : Icons.male_rounded,
+            "Gender",
+            profile?.gender.isNotEmpty == true ? profile!.gender : 'Not set',
           ),
-          _buildInfoRow(Icons.school_outlined, "Department", "Computer Science", primaryColor, textPrimary, textSecondary),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Divider(height: 1, color: Color(0xFFF1F5F9)),
-          ),
-          _buildInfoRow(Icons.groups_outlined, "Batch", "Spring 2022", primaryColor, textPrimary, textSecondary),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, Color primaryColor, Color textPrimary, Color textSecondary) {
+  Widget _divider() => const Padding(
+    padding: EdgeInsets.symmetric(vertical: 14),
+    child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+  );
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    final isSet = value != 'Not set';
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.08),
+            color: kPrimaryBlue.withOpacity(0.08),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, size: 20, color: primaryColor),
+          child: Icon(icon, size: 20, color: kPrimaryBlue),
         ),
         const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: textSecondary,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kTextSecondary,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: textPrimary,
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: isSet ? kTextPrimary : const Color(0xFFCBD5E1),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildSettingsSection(Color primaryColor, Color textPrimary, Color textSecondary) {
+  Widget _buildActionsSection(UserProfile? profile) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 24, bottom: 12),
+          padding: const EdgeInsets.only(left: 24, bottom: 10),
           child: Text(
-            "SETTINGS",
+            "ACCOUNT",
             style: GoogleFonts.plusJakartaSans(
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              color: textSecondary,
+              color: kTextSecondary,
               letterSpacing: 1.2,
             ),
           ),
         ),
-        _buildMenuTile(Icons.edit_outlined, "Edit Profile", primaryColor, textPrimary),
-        _buildMenuTile(Icons.account_balance_wallet_outlined, "Payment Methods", primaryColor, textPrimary),
-        _buildMenuTile(Icons.settings_suggest_outlined, "Preferences", primaryColor, textPrimary),
+        _buildMenuTile(
+          Icons.edit_outlined,
+          "Edit Profile",
+          "Update your personal information",
+          onTap: () {
+            if (profile != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(profile: profile),
+                ),
+              );
+            }
+          },
+        ),
+        _buildMenuTile(
+          Icons.directions_car_outlined,
+          "My Rides",
+          "View and manage your rides",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyRidesScreen()),
+            );
+          },
+        ),
+        _buildMenuTile(
+          Icons.info_outline_rounded,
+          "About Ryden",
+          "Version 1.0.0",
+          onTap: () {
+            showAboutDialog(
+              context: context,
+              applicationName: 'Ryden',
+              applicationVersion: '1.0.0',
+              applicationLegalese: '© 2026 Ryden — NSU Ridesharing',
+            );
+          },
+        ),
       ],
     );
   }
 
-  Widget _buildSafetySection(Color textPrimary, Color textSecondary) {
+  Widget _buildSafetySection() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -241,6 +380,7 @@ class ProfileScreen extends StatelessWidget {
         border: Border.all(color: Colors.redAccent.withOpacity(0.1)),
       ),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: const BoxDecoration(
@@ -271,9 +411,83 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuTile(IconData icon, String title, Color primaryColor, Color textPrimary) {
+  Widget _buildLogoutButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: OutlinedButton.icon(
+          onPressed: _showLogoutDialog,
+          icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 20),
+          label: Text(
+            "Log Out",
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              color: const Color(0xFFEF4444),
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFFFD5D5), width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            backgroundColor: const Color(0xFFFFF5F5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          "Log Out?",
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18),
+        ),
+        content: Text(
+          "Are you sure you want to log out of your account?",
+          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              "Cancel",
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: kTextSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await AuthService.signOut();
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const AuthGate()),
+                  (route) => false,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: Text(
+              "Log Out",
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuTile(IconData icon, String title, String subtitle, {VoidCallback? onTap}) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -286,24 +500,32 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(10),
+            color: kPrimaryBlue.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: primaryColor, size: 20),
+          child: Icon(icon, color: kPrimaryBlue, size: 20),
         ),
         title: Text(
           title,
           style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.w700,
-            color: textPrimary,
+            color: kTextPrimary,
             fontSize: 15,
           ),
         ),
+        subtitle: Text(
+          subtitle,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            color: kTextSecondary,
+          ),
+        ),
         trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFFCBD5E1)),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }

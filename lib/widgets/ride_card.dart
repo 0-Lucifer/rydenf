@@ -90,7 +90,7 @@ class RideCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          ride.driverName ?? "Anonymous",
+                          ride.driverName.isEmpty ? "Anonymous" : ride.driverName,
                           style: GoogleFonts.plusJakartaSans(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,

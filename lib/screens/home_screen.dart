@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/ride_model.dart';
+import '../models/user_model.dart';
 import '../widgets/ride_card.dart';
 import '../widgets/action_tile.dart';
+import '../services/auth_service.dart';
+import '../services/firestore_service.dart';
 import 'offer_ride_screen.dart';
 import 'available_rides.dart';
 
@@ -12,35 +16,6 @@ class RydenHome extends StatefulWidget {
 }
 
 class _RydenHomeState extends State<RydenHome> {
-  final List<Ride> upcomingRides = [
-    Ride(
-      driverName: "Sarah Ahmed",
-      rating: "4.9",
-      vehicleId: "DHAKA-METRO-KA-1234",
-      vehicleType: VehicleType.bike,
-      vehicleModel: "Yamaha R15",
-      origin: "NSU Campus Gate",
-      destination: "Bashundhara City",
-      departureTime: DateTime.now().add(const Duration(hours: 2)),
-      seatsTotal: 1,
-      seatsAvailable: 1,
-      pricePerSeat: 120.0,
-    ),
-    Ride(
-      driverName: "Rafiqul Islam",
-      rating: "4.8",
-      vehicleId: "DHAKA-METRO-GA-5678",
-      vehicleType: VehicleType.car,
-      vehicleModel: "Toyota Corolla",
-      origin: "Gulshan 2 Circle",
-      destination: "Dhanmondi 27",
-      departureTime: DateTime.now().add(const Duration(hours: 4, minutes: 15)),
-      seatsTotal: 4,
-      seatsAvailable: 2,
-      pricePerSeat: 180.0,
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,14 +63,14 @@ class _RydenHomeState extends State<RydenHome> {
 
           // 2. THE CONTENT AREA
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(0, 40, 0, 100), // Reduced top padding from 50 to 40
+            padding: const EdgeInsets.fromLTRB(0, 40, 0, 100),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _sectionHeader("Quick Actions", false),
                 _buildQuickActionsGrid(),
                 const SizedBox(height: 5),
                 _sectionHeader("Upcoming Rides", true),
-                ...upcomingRides.map((ride) => RideCard(ride: ride)),
+                _buildUpcomingRides(),
               ]),
             ),
           ),
@@ -113,24 +88,33 @@ class _RydenHomeState extends State<RydenHome> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text("Welcome back,", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                Text(
-                  "2212302642",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+            StreamBuilder<UserProfile?>(
+              stream: FirestoreService.getUserProfileStream(),
+              builder: (context, snapshot) {
+                final profile = snapshot.data;
+                final displayName = (profile?.displayName.isNotEmpty == true)
+                    ? profile!.displayName
+                    : (AuthService.currentUser?.email?.split('@').first ?? 'Student');
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text("Welcome back,", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             Row(
               children: [
-                _headerIcon(Icons.notifications_none_rounded, badge: 2),
+                _headerIcon(Icons.notifications_none_rounded, badge: 0),
                 const SizedBox(width: 12),
                 _headerIcon(Icons.settings_outlined),
               ],
@@ -225,13 +209,76 @@ class _RydenHomeState extends State<RydenHome> {
     ]),
   );
 
+  Widget _buildUpcomingRides() {
+    return StreamBuilder<List<Ride>>(
+      stream: FirestoreService.getAvailableRidesStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(40),
+            child: Center(
+              child: CircularProgressIndicator(color: Color(0xFF2E7CF6)),
+            ),
+          );
+        }
+
+        final rides = snapshot.data ?? [];
+
+        if (rides.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(40),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.directions_car_outlined, size: 50, color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+                  Text(
+                    "No rides available yet",
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Be the first to offer a ride!",
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Show up to 5 most recent rides on home
+        final displayRides = rides.take(5).toList();
+        return Column(
+          children: displayRides.map((ride) => RideCard(ride: ride)).toList(),
+        );
+      },
+    );
+  }
+
   Widget _sectionHeader(String title, bool showAll) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-        if (showAll) const Text("See All", style: TextStyle(color: Color(0xFF2E7CF6), fontWeight: FontWeight.bold)),
+        if (showAll) 
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AvailableRidesScreen()),
+              );
+            },
+            child: const Text("See All", style: TextStyle(color: Color(0xFF2E7CF6), fontWeight: FontWeight.bold)),
+          ),
       ],
     ),
   );

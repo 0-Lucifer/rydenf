@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../models/ride_model.dart';
 import '../widgets/ride_card.dart';
+import '../services/firestore_service.dart';
 
 class AvailableRidesScreen extends StatefulWidget {
   const AvailableRidesScreen({super.key});
@@ -15,66 +16,22 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
   final TextEditingController _fromController = TextEditingController();
   final TextEditingController _toController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
-  
-  // Dummy rides for initial list and results
-  final List<Ride> _allRides = [
-    Ride(
-      driverName: "Sarah Ahmed",
-      rating: "4.9",
-      vehicleId: "DHAKA-METRO-KA-1234",
-      vehicleType: VehicleType.bike,
-      vehicleModel: "Yamaha R15",
-      origin: "NSU Campus Gate",
-      destination: "Bashundhara City",
-      departureTime: DateTime.now().add(const Duration(hours: 2)),
-      seatsTotal: 1,
-      seatsAvailable: 1,
-      pricePerSeat: 120.0,
-    ),
-    Ride(
-      driverName: "Rafiqul Islam",
-      rating: "4.8",
-      vehicleId: "DHAKA-METRO-GA-5678",
-      vehicleType: VehicleType.car,
-      vehicleModel: "Toyota Corolla",
-      origin: "Gulshan 2 Circle",
-      destination: "Dhanmondi 27",
-      departureTime: DateTime.now().add(const Duration(hours: 4, minutes: 15)),
-      seatsTotal: 4,
-      seatsAvailable: 2,
-      pricePerSeat: 180.0,
-    ),
-    Ride(
-      driverName: "Tanvir Hasan",
-      rating: "4.7",
-      vehicleId: "DHAKA-METRO-THA-9012",
-      vehicleType: VehicleType.cng,
-      vehicleModel: "Bajaj RE",
-      origin: "Banani 11",
-      destination: "Uttara Sector 7",
-      departureTime: DateTime.now().add(const Duration(hours: 1)),
-      seatsTotal: 3,
-      seatsAvailable: 3,
-      pricePerSeat: 150.0,
-    ),
-  ];
+  String _searchFrom = '';
+  String _searchTo = '';
 
-  List<Ride> _filteredRides = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _filteredRides = List.from(_allRides);
+  void _updateFilters() {
+    setState(() {
+      _searchFrom = _fromController.text.trim().toLowerCase();
+      _searchTo = _toController.text.trim().toLowerCase();
+    });
   }
 
-  void _filterRides() {
-    setState(() {
-      _filteredRides = _allRides.where((ride) {
-        final matchFrom = _fromController.text.isEmpty || ride.origin.toLowerCase().contains(_fromController.text.toLowerCase());
-        final matchTo = _toController.text.isEmpty || ride.destination.toLowerCase().contains(_toController.text.toLowerCase());
-        return matchFrom && matchTo;
-      }).toList();
-    });
+  List<Ride> _applyFilters(List<Ride> rides) {
+    return rides.where((ride) {
+      final matchFrom = _searchFrom.isEmpty || ride.origin.toLowerCase().contains(_searchFrom);
+      final matchTo = _searchTo.isEmpty || ride.destination.toLowerCase().contains(_searchTo);
+      return matchFrom && matchTo;
+    }).toList();
   }
 
   @override
@@ -86,13 +43,49 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
         children: [
           _buildSearchSection(),
           Expanded(
-            child: _filteredRides.isEmpty 
-              ? _buildNoResults()
-              : ListView.builder(
+            child: StreamBuilder<List<Ride>>(
+              stream: FirestoreService.getAvailableRidesStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline_rounded, size: 50, color: Colors.redAccent.shade100),
+                        const SizedBox(height: 12),
+                        Text(
+                          "Something went wrong",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final allRides = snapshot.data ?? [];
+                final filteredRides = _applyFilters(allRides);
+
+                if (filteredRides.isEmpty) {
+                  return _buildNoResults();
+                }
+
+                return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(0, 10, 0, 30),
-                  itemCount: _filteredRides.length,
-                  itemBuilder: (context, index) => RideCard(ride: _filteredRides[index]),
-                ),
+                  itemCount: filteredRides.length,
+                  itemBuilder: (context, index) => RideCard(ride: filteredRides[index]),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -191,7 +184,7 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
               ),
               const SizedBox(width: 12),
               ElevatedButton(
-                onPressed: _filterRides,
+                onPressed: _updateFilters,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4F46E5),
                   minimumSize: const Size(100, 50),
@@ -220,7 +213,7 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
         Expanded(
           child: TextField(
             controller: controller,
-            onChanged: (_) => _filterRides(),
+            onChanged: (_) => _updateFilters(),
             style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 15),
             decoration: InputDecoration(
               hintText: hint,
@@ -248,6 +241,14 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: Colors.grey.shade500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Try a different search or check back later",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: Colors.grey.shade400,
             ),
           ),
         ],
