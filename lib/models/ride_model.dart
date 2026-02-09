@@ -19,7 +19,8 @@ class Ride {
   final String genderPreference;
   final double pricePerSeat;
   final bool instantMatch;
-  final String status;
+  final String status; // active, full, completed, cancelled
+  final List<String> passengers; // accepted passenger UIDs
   final DateTime createdAt;
 
   Ride({
@@ -40,6 +41,7 @@ class Ride {
     required this.pricePerSeat,
     this.instantMatch = false,
     this.status = 'active',
+    this.passengers = const [],
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -62,6 +64,7 @@ class Ride {
       'pricePerSeat': pricePerSeat,
       'instantMatch': instantMatch,
       'status': status,
+      'passengers': passengers,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
@@ -86,6 +89,7 @@ class Ride {
       pricePerSeat: (map['pricePerSeat'] ?? 0).toDouble(),
       instantMatch: map['instantMatch'] ?? false,
       status: map['status'] ?? 'active',
+      passengers: List<String>.from(map['passengers'] ?? []),
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }

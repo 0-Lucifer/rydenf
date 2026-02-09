@@ -109,7 +109,13 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
       _selectedTime.minute,
     );
 
-    final driverName = AuthService.currentUser?.email?.split('@').first ?? 'Unknown';
+    // Get proper display name from Firestore
+    final profile = await FirestoreService.getUserProfile(uid);
+    final driverName = (profile?.displayName.isNotEmpty == true)
+        ? profile!.displayName
+        : (AuthService.currentUser?.displayName ??
+            AuthService.currentUser?.email?.split('@').first ??
+            'Unknown');
 
     final ride = Ride(
       driverId: uid,
