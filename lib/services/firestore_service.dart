@@ -4,6 +4,7 @@ import '../models/user_model.dart';
 import '../models/ride_model.dart';
 import '../models/ride_request_model.dart';
 import '../models/notification_model.dart';
+import '../models/rating_model.dart';
 
 class FirestoreService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -665,6 +666,80 @@ class FirestoreService {
       await batch.commit();
     } catch (e) {
       print('[FirestoreService] markAllAsRead error: $e');
+    }
+  }
+
+  /// Delete notifications older than 3 days to optimize storage
+  static Future<void> cleanupOldNotifications() async {
+    try {
+      final cutoff = DateTime.now().subtract(const Duration(days: 3));
+      final old = await _db
+          .collection('notifications')
+          .where('createdAt', isLessThan: Timestamp.fromDate(cutoff))
+          .get();
+
+      if (old.docs.isEmpty) return;
+
+      final batch = _db.batch();
+      for (final doc in old.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      print('[FirestoreService] Cleaned up ${old.docs.length} old notifications');
+    } catch (e) {
+      print('[FirestoreService] cleanupOldNotifications error: $e');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  RATINGS
+  // ═══════════════════════════════════════════════════════
+
+  /// Submit a rating for a user after a ride
+  static Future<bool> submitRating(RideRating rating) async {
+    try {
+      await _db.collection('ratings').add(rating.toMap());
+      return true;
+    } catch (e) {
+      print('[FirestoreService] submitRating error: $e');
+      return false;
+    }
+  }
+
+  /// Stream the average rating for a user
+  static Stream<double?> getAverageRating(String userId) {
+    return _db
+        .collection('ratings')
+        .where('toUserId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) return null;
+      double total = 0;
+      for (final doc in snapshot.docs) {
+        total += (doc.data()['rating'] as num?)?.toDouble() ?? 5.0;
+      }
+      return total / snapshot.docs.length;
+    }).handleError((error) {
+      print('[FirestoreService] getAverageRating error: $error');
+      return null;
+    });
+  }
+
+  /// Check if current user has already rated someone for a specific ride
+  static Future<bool> hasRatedForRide(String rideId, String toUserId) async {
+    if (_uid == null) return true;
+    try {
+      final snap = await _db
+          .collection('ratings')
+          .where('rideId', isEqualTo: rideId)
+          .get();
+      return snap.docs.any((doc) {
+        final d = doc.data();
+        return d['fromUserId'] == _uid && d['toUserId'] == toUserId;
+      });
+    } catch (e) {
+      print('[FirestoreService] hasRatedForRide error: $e');
+      return true;
     }
   }
 }

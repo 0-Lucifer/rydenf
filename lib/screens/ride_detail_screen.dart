@@ -378,9 +378,18 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                   children: [
                     const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 16),
                     const SizedBox(width: 4),
-                    Text("5.0", style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13, fontWeight: FontWeight.w700, color: kTextSecondary,
-                    )),
+                    StreamBuilder<double?>(
+                      stream: FirestoreService.getAverageRating(ride.driverId),
+                      builder: (context, ratingSnap) {
+                        final avg = ratingSnap.data;
+                        return Text(
+                          avg != null ? avg.toStringAsFixed(1) : "No rating yet",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13, fontWeight: FontWeight.w700, color: kTextSecondary,
+                          ),
+                        );
+                      },
+                    ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

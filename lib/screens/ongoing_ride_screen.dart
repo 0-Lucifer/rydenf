@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../models/ride_model.dart';
+import '../models/rating_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../widgets/rating_dialog.dart';
 
 class OngoingRideScreen extends StatelessWidget {
   final String rideId;
@@ -447,13 +449,13 @@ class OngoingRideScreen extends StatelessWidget {
               height: 56,
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
-                label: Text("Done", style: GoogleFonts.plusJakartaSans(
+                onPressed: () => _showRatingFlow(context, ride, isDriver),
+                icon: const Icon(Icons.star_rounded, color: Colors.white),
+                label: Text("Rate & Finish", style: GoogleFonts.plusJakartaSans(
                   fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white,
                 )),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kTextSecondary,
+                  backgroundColor: const Color(0xFFF59E0B),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 0,
                 ),
@@ -545,4 +547,67 @@ class OngoingRideScreen extends StatelessWidget {
     borderRadius: BorderRadius.circular(24),
     boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 8))],
   );
+
+  // ───────────────────────────────────────────────────────
+  //  RATING FLOW
+  // ───────────────────────────────────────────────────────
+
+  Future<void> _showRatingFlow(BuildContext context, Ride ride, bool isDriver) async {
+    final currentUid = AuthService.currentUser?.uid;
+    if (currentUid == null) {
+      if (context.mounted) Navigator.pop(context);
+      return;
+    }
+
+    if (isDriver) {
+      // Driver rates each passenger
+      for (final passengerId in ride.passengers) {
+        final alreadyRated = await FirestoreService.hasRatedForRide(ride.id!, passengerId);
+        if (alreadyRated || !context.mounted) continue;
+
+        final passengerName = await _getPassengerName(passengerId);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => RatingDialog(
+            userName: passengerName,
+            role: 'passenger',
+            onSubmit: (rating, comment) async {
+              await FirestoreService.submitRating(RideRating(
+                rideId: ride.id!,
+                fromUserId: currentUid,
+                toUserId: passengerId,
+                rating: rating,
+                comment: comment,
+              ));
+            },
+          ),
+        );
+      }
+    } else {
+      // Passenger rates the driver
+      final alreadyRated = await FirestoreService.hasRatedForRide(ride.id!, ride.driverId);
+      if (!alreadyRated && context.mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => RatingDialog(
+            userName: ride.driverName,
+            role: 'driver',
+            onSubmit: (rating, comment) async {
+              await FirestoreService.submitRating(RideRating(
+                rideId: ride.id!,
+                fromUserId: currentUid,
+                toUserId: ride.driverId,
+                rating: rating,
+                comment: comment,
+              ));
+            },
+          ),
+        );
+      }
+    }
+
+    if (context.mounted) Navigator.pop(context);
+  }
 }

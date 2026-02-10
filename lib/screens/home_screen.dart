@@ -9,6 +9,7 @@ import '../services/firestore_service.dart';
 import 'offer_ride_screen.dart';
 import 'available_rides.dart';
 import 'notifications_screen.dart';
+import 'ongoing_ride_screen.dart';
 
 class RydenHome extends StatefulWidget {
   const RydenHome({super.key});
@@ -68,6 +69,7 @@ class _RydenHomeState extends State<RydenHome> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _sectionHeader("Quick Actions", false),
+                _buildOngoingRideBanner(),
                 _buildQuickActionsGrid(),
                 const SizedBox(height: 5),
                 _sectionHeader("Upcoming Rides", true),
@@ -188,6 +190,274 @@ class _RydenHomeState extends State<RydenHome> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildOngoingRideBanner() {
+    return StreamBuilder<List<Ride>>(
+      stream: FirestoreService.getUserRidesStream(),
+      builder: (context, driverSnap) {
+        return StreamBuilder<List<Ride>>(
+          stream: FirestoreService.getMyActiveRidesAsPassenger(),
+          builder: (context, passengerSnap) {
+            final driverRides = (driverSnap.data ?? [])
+                .where((r) => r.status == 'in_progress')
+                .toList();
+            final passengerRides = passengerSnap.data ?? [];
+
+            final Map<String, Ride> rideMap = {};
+            for (final r in [...driverRides, ...passengerRides]) {
+              if (r.id != null) rideMap[r.id!] = r;
+            }
+            final activeRides = rideMap.values.toList();
+            final hasRide = activeRides.isNotEmpty;
+            final ride = hasRide ? activeRides.first : null;
+            final isDriver = ride != null && ride.driverId == AuthService.currentUser?.uid;
+
+            return AnimatedSize(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+              child: AnimatedOpacity(
+                opacity: hasRide ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 350),
+                child: hasRide
+                    ? GestureDetector(
+                        onTap: () {
+                          Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => OngoingRideScreen(rideId: ride!.id!),
+                          ));
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                          padding: const EdgeInsets.all(0),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF0F172A).withOpacity(0.35),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Stack(
+                              children: [
+                                // Subtle gradient accent
+                                Positioned(
+                                  right: -30,
+                                  top: -30,
+                                  child: Container(
+                                    width: 100,
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: RadialGradient(
+                                        colors: [
+                                          const Color(0xFF10B981).withOpacity(0.25),
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: -20,
+                                  bottom: -20,
+                                  child: Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: RadialGradient(
+                                        colors: [
+                                          const Color(0xFF2E7CF6).withOpacity(0.15),
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // Content
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          // Live indicator
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF10B981).withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: const Color(0xFF10B981).withOpacity(0.3),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                TweenAnimationBuilder<double>(
+                                                  tween: Tween(begin: 0.3, end: 1.0),
+                                                  duration: const Duration(milliseconds: 800),
+                                                  builder: (_, value, __) => Container(
+                                                    width: 7,
+                                                    height: 7,
+                                                    decoration: BoxDecoration(
+                                                      color: Color.lerp(
+                                                        const Color(0xFF10B981).withOpacity(0.4),
+                                                        const Color(0xFF10B981),
+                                                        value,
+                                                      ),
+                                                      shape: BoxShape.circle,
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: const Color(0xFF10B981).withOpacity(0.5 * value),
+                                                          blurRadius: 6,
+                                                          spreadRadius: 1,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  "LIVE",
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: const Color(0xFF10B981),
+                                                    letterSpacing: 1,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          // Passenger count chip
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(0.08),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.people_rounded, size: 13, color: Colors.white.withOpacity(0.6)),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  "${ride!.passengers.length}",
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Colors.white.withOpacity(0.7),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          Icon(
+                                            Icons.arrow_forward_ios_rounded,
+                                            color: Colors.white.withOpacity(0.3),
+                                            size: 14,
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  isDriver ? "Your ride is live" : "Ride in progress",
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 6,
+                                                      height: 6,
+                                                      decoration: const BoxDecoration(
+                                                        color: Color(0xFF10B981),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Text(
+                                                        ride.origin,
+                                                        style: GoogleFonts.plusJakartaSans(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w500,
+                                                          color: Colors.white.withOpacity(0.6),
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 6,
+                                                      height: 6,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white.withOpacity(0.4),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Text(
+                                                        ride.destination,
+                                                        style: GoogleFonts.plusJakartaSans(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w500,
+                                                          color: Colors.white.withOpacity(0.6),
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

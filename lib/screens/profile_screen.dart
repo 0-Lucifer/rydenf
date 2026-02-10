@@ -209,6 +209,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 10),
+              // Live rating
+              StreamBuilder<double?>(
+                stream: FirestoreService.getAverageRating(
+                  profile?.uid ?? AuthService.currentUser?.uid ?? '',
+                ),
+                builder: (context, ratingSnap) {
+                  final avg = ratingSnap.data;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          avg != null ? Icons.star_rounded : Icons.star_outline_rounded,
+                          size: 16,
+                          color: avg != null ? const Color(0xFFFBBF24) : Colors.white.withOpacity(0.6),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          avg != null ? "${avg.toStringAsFixed(1)} rating" : "No rating yet",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withOpacity(avg != null ? 1 : 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
