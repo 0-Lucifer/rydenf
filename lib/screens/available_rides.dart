@@ -236,7 +236,7 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
           Icon(Icons.search_off_rounded, size: 60, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           Text(
-            "No rides found",
+            "Nothing yet",
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.w700,

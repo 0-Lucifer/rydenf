@@ -5,6 +5,7 @@ import '../models/ride_model.dart';
 import '../models/ride_request_model.dart';
 import '../services/firestore_service.dart';
 import 'ride_detail_screen.dart';
+import 'ongoing_ride_screen.dart';
 
 class TripsScreen extends StatefulWidget {
   const TripsScreen({super.key});
@@ -71,13 +72,8 @@ class _TripsScreenState extends State<TripsScreen> with SingleTickerProviderStat
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
               child: Row(
                 children: [
-                  Text(
-                    "My Trips",
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: kTextPrimary,
-                    ),
+                  Text("My Trips",
+                    style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800, color: kTextPrimary),
                   ),
                 ],
               ),
@@ -132,7 +128,7 @@ class _TripsScreenState extends State<TripsScreen> with SingleTickerProviderStat
         if (rides.isEmpty) {
           return _emptyState(
             Icons.directions_car_outlined,
-            "No rides offered yet",
+            "Nothing yet",
             "Rides you offer will appear here",
           );
         }
@@ -150,31 +146,47 @@ class _TripsScreenState extends State<TripsScreen> with SingleTickerProviderStat
   Widget _buildOfferCard(Ride ride) {
     final formattedDate = DateFormat('EEE, MMM dd').format(ride.departureTime);
     final formattedTime = DateFormat('hh:mm a').format(ride.departureTime);
-    final isActive = ride.status == 'active';
-    final isFull = ride.status == 'full';
 
     Color statusColor;
     String statusLabel;
-    if (isActive) {
-      statusColor = const Color(0xFF10B981);
-      statusLabel = 'Active';
-    } else if (isFull) {
-      statusColor = const Color(0xFFF59E0B);
-      statusLabel = 'Full';
-    } else if (ride.status == 'cancelled') {
-      statusColor = const Color(0xFFEF4444);
-      statusLabel = 'Cancelled';
-    } else {
-      statusColor = kPrimary;
-      statusLabel = ride.status;
+    switch (ride.status) {
+      case 'active':
+        statusColor = const Color(0xFF10B981);
+        statusLabel = 'Active';
+        break;
+      case 'full':
+        statusColor = const Color(0xFFF59E0B);
+        statusLabel = 'Full';
+        break;
+      case 'in_progress':
+        statusColor = kPrimary;
+        statusLabel = 'In Progress';
+        break;
+      case 'cancelled':
+        statusColor = const Color(0xFFEF4444);
+        statusLabel = 'Cancelled';
+        break;
+      case 'completed':
+        statusColor = kTextSecondary;
+        statusLabel = 'Completed';
+        break;
+      default:
+        statusColor = kPrimary;
+        statusLabel = ride.status;
     }
 
     return GestureDetector(
       onTap: () {
         if (ride.id != null) {
-          Navigator.push(context, MaterialPageRoute(
-            builder: (_) => RideDetailScreen(rideId: ride.id!),
-          ));
+          if (ride.status == 'in_progress') {
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => OngoingRideScreen(rideId: ride.id!),
+            ));
+          } else {
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => RideDetailScreen(rideId: ride.id!),
+            ));
+          }
         }
       },
       child: Container(
@@ -264,7 +276,7 @@ class _TripsScreenState extends State<TripsScreen> with SingleTickerProviderStat
         if (bookings.isEmpty) {
           return _emptyState(
             Icons.bookmark_border_rounded,
-            "No bookings yet",
+            "Nothing yet",
             "Rides you book will appear here",
           );
         }
@@ -331,7 +343,7 @@ class _TripsScreenState extends State<TripsScreen> with SingleTickerProviderStat
 }
 
 // ═══════════════════════════════════════════════════════
-//  BOOKING CARD (separate widget that fetches ride data)
+//  BOOKING CARD
 // ═══════════════════════════════════════════════════════
 
 class _BookingCard extends StatefulWidget {
@@ -408,12 +420,19 @@ class _BookingCardState extends State<_BookingCard> {
     }
 
     final canCancel = widget.booking.status == 'pending' || widget.booking.status == 'accepted';
+    final isInProgress = _ride!.status == 'in_progress';
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(
-          builder: (_) => RideDetailScreen(rideId: widget.booking.rideId),
-        ));
+        if (isInProgress && widget.booking.status == 'accepted') {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => OngoingRideScreen(rideId: widget.booking.rideId),
+          ));
+        } else {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => RideDetailScreen(rideId: widget.booking.rideId),
+          ));
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
@@ -494,7 +513,35 @@ class _BookingCardState extends State<_BookingCard> {
                 ],
               ),
             ),
-            if (canCancel)
+            if (isInProgress && widget.booking.status == 'accepted')
+              Container(
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => OngoingRideScreen(rideId: widget.booking.rideId),
+                    )),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.play_circle_filled_rounded, size: 18, color: Color(0xFF10B981)),
+                          const SizedBox(width: 6),
+                          Text("View Ongoing Ride", style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF10B981),
+                          )),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else if (canCancel && !isInProgress)
               Container(
                 decoration: const BoxDecoration(
                   border: Border(top: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
