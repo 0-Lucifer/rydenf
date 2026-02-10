@@ -22,7 +22,7 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
   int _seatsAvailable = 3;
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
-  bool _instantBooking = true;
+  bool _instantBooking = false;
   bool _isPublishing = false;
 
   // Route Management
