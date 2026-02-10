@@ -5,6 +5,7 @@ import '../models/ride_model.dart';
 import '../models/ride_request_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import 'ongoing_ride_screen.dart';
 
 class RideDetailScreen extends StatefulWidget {
   final String rideId;
@@ -56,9 +57,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           return CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              // Header
               SliverToBoxAdapter(child: _buildHeader(ride)),
-              // Content
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
                 sliver: SliverList(
@@ -127,7 +126,6 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Back button
               Row(
                 children: [
                   GestureDetector(
@@ -146,7 +144,6 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              // Vehicle type
               Row(
                 children: [
                   Container(
@@ -159,8 +156,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                       ride.vehicleType == VehicleType.bike
                           ? Icons.two_wheeler_rounded
                           : Icons.directions_car_filled_rounded,
-                      color: Colors.white,
-                      size: 28,
+                      color: Colors.white, size: 28,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -171,16 +167,13 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                         Text(
                           ride.vehicleType == VehicleType.bike ? "Bike Ride" : "Car Ride",
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
+                            fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white,
                           ),
                         ),
                         Text(
                           "$formattedDate • $formattedTime",
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 13, fontWeight: FontWeight.w500,
                             color: Colors.white.withOpacity(0.8),
                           ),
                         ),
@@ -190,15 +183,13 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              // Stats row
               Row(
                 children: [
                   _headerStat(Icons.event_seat_rounded, "${ride.seatsAvailable}/${ride.seatsTotal} seats"),
                   const SizedBox(width: 16),
                   _headerStat(Icons.attach_money_rounded, "৳${ride.pricePerSeat.toInt()}/seat"),
                   const SizedBox(width: 16),
-                  if (ride.instantMatch)
-                    _headerStat(Icons.bolt_rounded, "Instant"),
+                  _headerStat(Icons.people_rounded, "${ride.passengers.length} booked"),
                 ],
               ),
             ],
@@ -220,12 +211,16 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         color = const Color(0xFFF59E0B);
         label = 'Full';
         break;
+      case 'in_progress':
+        color = kPrimary;
+        label = 'In Progress';
+        break;
       case 'cancelled':
         color = kRed;
         label = 'Cancelled';
         break;
       case 'completed':
-        color = kPrimary;
+        color = kTextSecondary;
         label = 'Completed';
         break;
       default:
@@ -234,16 +229,10 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 12, fontWeight: FontWeight.w800, color: color,
-        ),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+      child: Text(label, style: GoogleFonts.plusJakartaSans(
+        fontSize: 12, fontWeight: FontWeight.w800, color: color,
+      )),
     );
   }
 
@@ -318,17 +307,9 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         children: [
           Expanded(child: _infoTile(Icons.people_outline_rounded, "Gender Pref", ride.genderPreference)),
           const SizedBox(width: 12),
-          Expanded(child: _infoTile(
-            Icons.bolt_rounded,
-            "Booking",
-            ride.instantMatch ? "Instant" : "Approval",
-          )),
+          Expanded(child: _infoTile(Icons.approval_rounded, "Booking", ride.instantMatch ? "Instant \u26A1" : "Driver Approves")),
           const SizedBox(width: 12),
-          Expanded(child: _infoTile(
-            Icons.directions_car_outlined,
-            "Vehicle",
-            ride.vehicleModel,
-          )),
+          Expanded(child: _infoTile(Icons.directions_car_outlined, "Vehicle", ride.vehicleModel)),
         ],
       ),
     );
@@ -347,7 +328,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           )),
           const SizedBox(height: 4),
           Text(value, style: GoogleFonts.plusJakartaSans(
-            fontSize: 13, fontWeight: FontWeight.w800, color: kTextPrimary,
+            fontSize: 12, fontWeight: FontWeight.w800, color: kTextPrimary,
           ), textAlign: TextAlign.center),
         ],
       ),
@@ -397,12 +378,9 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                   children: [
                     const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 16),
                     const SizedBox(width: 4),
-                    Text(
-                      ride.rating ?? "5.0",
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13, fontWeight: FontWeight.w700, color: kTextSecondary,
-                      ),
-                    ),
+                    Text("5.0", style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13, fontWeight: FontWeight.w700, color: kTextSecondary,
+                    )),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -418,14 +396,6 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                 ),
               ],
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: kPrimary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.person_rounded, color: kPrimary, size: 20),
           ),
         ],
       ),
@@ -475,7 +445,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.inbox_rounded, size: 20, color: kPrimary),
+              const Icon(Icons.inbox_rounded, size: 20, color: kPrimary),
               const SizedBox(width: 10),
               Text("Ride Requests", style: GoogleFonts.plusJakartaSans(
                 fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary,
@@ -495,16 +465,30 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               final requests = snapshot.data ?? [];
               if (requests.isEmpty) {
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Center(
-                    child: Text("No requests yet",
-                      style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
+                    child: Column(
+                      children: [
+                        Icon(Icons.hourglass_empty_rounded, size: 32, color: Colors.grey.shade300),
+                        const SizedBox(height: 8),
+                        Text("Nothing yet",
+                          style: GoogleFonts.plusJakartaSans(
+                            color: kTextSecondary, fontSize: 14, fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text("Requests will appear here",
+                          style: GoogleFonts.plusJakartaSans(
+                            color: Colors.grey.shade400, fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );
               }
               return Column(
-                children: requests.map((req) => _buildRequestTile(req, ride)).toList(),
+                children: requests.map((req) => _buildRequestTile(req)).toList(),
               );
             },
           ),
@@ -513,7 +497,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     );
   }
 
-  Widget _buildRequestTile(RideRequest req, Ride ride) {
+  Widget _buildRequestTile(RideRequest req) {
     final isPending = req.status == 'pending';
 
     Color statusColor;
@@ -571,9 +555,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                     ),
                     Text(
                       "${req.seatsRequested} seat${req.seatsRequested > 1 ? 's' : ''} requested",
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12, color: kTextSecondary,
-                      ),
+                      style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTextSecondary),
                     ),
                   ],
                 ),
@@ -636,6 +618,8 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
 
   Widget _buildBottomBar(Ride ride, bool isDriver, bool isPassenger) {
     final isCancelled = ride.status == 'cancelled';
+    final isCompleted = ride.status == 'completed';
+    final isInProgress = ride.status == 'in_progress';
     final isFull = ride.status == 'full';
 
     return Container(
@@ -646,7 +630,6 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
       ),
       child: Row(
         children: [
-          // Price display
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -665,12 +648,50 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               if (isCancelled) {
                 return _actionButton("Ride Cancelled", null, kTextSecondary);
               }
+              if (isCompleted) {
+                return _actionButton("Ride Completed", null, kTextSecondary);
+              }
 
               if (isDriver) {
+                if (isInProgress) {
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _actionButton("View Ride", () {
+                          Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => OngoingRideScreen(rideId: ride.id!),
+                          ));
+                        }, kPrimary),
+                      ),
+                    ],
+                  );
+                }
+                // Driver can start ride if there are passengers
+                if (ride.passengers.isNotEmpty) {
+                  return Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: _actionButton("Start Ride", () => _handleStartRide(ride), kGreen),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _actionButton("Cancel", () => _showCancelRideDialog(ride), kRed),
+                      ),
+                    ],
+                  );
+                }
                 return _actionButton("Cancel Ride", () => _showCancelRideDialog(ride), kRed);
               }
 
               if (isPassenger) {
+                if (isInProgress) {
+                  return _actionButton("View Ride", () {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => OngoingRideScreen(rideId: ride.id!),
+                    ));
+                  }, kPrimary);
+                }
                 return _actionButton("Cancel Booking", () => _showCancelBookingDialog(ride), kRed);
               }
 
@@ -678,9 +699,14 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                 return _actionButton("Ride Full", null, kTextSecondary);
               }
 
-              // Passenger can request
+              if (ride.driverId == _currentUid) {
+                return _actionButton("Your Ride", null, kTextSecondary);
+              }
+
               return _actionButton(
-                _isRequesting ? "Requesting..." : (ride.instantMatch ? "Book Instantly" : "Request Seat"),
+                _isRequesting
+                    ? "Booking..."
+                    : (ride.instantMatch ? "Book Instantly \u26A1" : "Request Seat"),
                 _isRequesting ? null : () => _handleRequest(ride),
                 kPrimary,
               );
@@ -702,11 +728,11 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
         ),
-        child: _isRequesting && text == "Requesting..."
+        child: _isRequesting && (text == "Booking..." || text == "Requesting...")
             ? const SizedBox(width: 22, height: 22,
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
             : Text(text, style: GoogleFonts.plusJakartaSans(
-                fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white,
+                fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white,
               )),
       ),
     );
@@ -721,12 +747,8 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
       _showSnack("You can't book your own ride.", false);
       return;
     }
-
     setState(() => _isRequesting = true);
-    final result = await FirestoreService.requestRide(
-      rideId: ride.id!,
-      instantBooking: ride.instantMatch,
-    );
+    final result = await FirestoreService.requestRide(rideId: ride.id!);
     setState(() => _isRequesting = false);
     if (mounted) _showSnack(result.message, result.success);
   }
@@ -741,6 +763,47 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     if (mounted) _showSnack(result.message, result.success);
   }
 
+  Future<void> _handleStartRide(Ride ride) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Start Ride?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
+        content: Text(
+          "Starting the ride will reject any remaining pending requests. ${ride.passengers.length} passenger${ride.passengers.length > 1 ? 's' : ''} will be notified.",
+          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text("Not Yet", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: kTextSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: Text("Start", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final result = await FirestoreService.startRide(ride.id!);
+      if (mounted) {
+        _showSnack(result.message, result.success);
+        if (result.success) {
+          Navigator.pushReplacement(context, MaterialPageRoute(
+            builder: (_) => OngoingRideScreen(rideId: ride.id!),
+          ));
+        }
+      }
+    }
+  }
+
   void _showCancelRideDialog(Ride ride) {
     showDialog(
       context: context,
@@ -748,7 +811,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text("Cancel Ride?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
         content: Text(
-          "This will cancel the ride and all existing bookings. This action cannot be undone.",
+          "This will cancel the ride and all existing bookings. This cannot be undone.",
           style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
         ),
         actions: [
@@ -775,7 +838,6 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   }
 
   void _showCancelBookingDialog(Ride ride) {
-    // Find the user's accepted request to cancel
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -793,13 +855,12 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              // Find the user's accepted/pending request
               final requests = await FirestoreService.getRequestsForRide(ride.id!).first;
-              final myRequest = requests.where(
+              final myReq = requests.where(
                 (r) => r.passengerId == _currentUid && (r.status == 'accepted' || r.status == 'pending'),
               ).firstOrNull;
-              if (myRequest != null) {
-                final result = await FirestoreService.cancelBooking(myRequest.id!);
+              if (myReq != null) {
+                final result = await FirestoreService.cancelBooking(myReq.id!);
                 if (mounted) _showSnack(result.message, result.success);
               }
             },

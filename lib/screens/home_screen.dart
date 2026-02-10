@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import 'offer_ride_screen.dart';
 import 'available_rides.dart';
+import 'notifications_screen.dart';
 
 class RydenHome extends StatefulWidget {
   const RydenHome({super.key});
@@ -114,7 +115,7 @@ class _RydenHomeState extends State<RydenHome> {
             ),
             Row(
               children: [
-                _headerIcon(Icons.notifications_none_rounded, badge: 0),
+                _notificationBell(),
                 const SizedBox(width: 12),
                 _headerIcon(Icons.settings_outlined),
               ],
@@ -142,6 +143,53 @@ class _RydenHomeState extends State<RydenHome> {
           )
       ),
   ]);
+
+  Widget _notificationBell() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+        );
+      },
+      child: StreamBuilder<int>(
+        stream: FirestoreService.getUnreadNotificationCount(),
+        builder: (context, snap) {
+          final count = snap.data ?? 0;
+          return Stack(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 22),
+              ),
+              if (count > 0)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    child: Text(
+                      count > 9 ? '9+' : '$count',
+                      style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   Widget _buildSearchBar() => GestureDetector(
     onTap: () {
