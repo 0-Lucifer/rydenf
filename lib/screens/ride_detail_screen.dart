@@ -16,737 +16,487 @@ class RideDetailScreen extends StatefulWidget {
 }
 
 class _RideDetailScreenState extends State<RideDetailScreen> {
-  static const Color kPrimary = Color(0xFF2E7CF6);
-  static const Color kTextPrimary = Color(0xFF0F172A);
-  static const Color kTextSecondary = Color(0xFF64748B);
-  static const Color kGreen = Color(0xFF10B981);
-  static const Color kRed = Color(0xFFEF4444);
+  // Premium "Royal Blue & Azure" Style System
+  static const Color kPrimary = Color(0xFF1E3A8A); // Deep Navy
+  static const Color kAccent = Color(0xFF3B82F6);  // Azure Blue
+  static const Color kBackground = Color(0xFFF8FAFC);
+  static const Color kSurface = Colors.white;
+  static const Color kTextMain = Color(0xFF0F172A);
+  static const Color kTextSub = Color(0xFF64748B);
+  static const Color kSuccess = Color(0xFF10B981);
+  static const Color kError = Color(0xFFEF4444);
+  static const Color kBorder = Color(0xFFE2E8F0);
 
   bool _isRequesting = false;
-
   String? get _currentUid => AuthService.currentUser?.uid;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: kBackground,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.white.withOpacity(0.9),
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: kTextMain, size: 18),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ),
+      ),
       body: StreamBuilder<Ride?>(
         stream: FirestoreService.getRideStream(widget.rideId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: kPrimary));
+            return const Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2));
           }
           final ride = snapshot.data;
-          if (ride == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 50, color: Colors.grey.shade300),
-                  const SizedBox(height: 12),
-                  Text("Ride not found", style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16, fontWeight: FontWeight.w700, color: Colors.grey.shade500,
-                  )),
-                ],
-              ),
-            );
-          }
-
-          final isDriver = ride.driverId == _currentUid;
-
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(child: _buildHeader(ride)),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    const SizedBox(height: 20),
-                    _buildRouteCard(ride),
-                    const SizedBox(height: 16),
-                    _buildRideInfoGrid(ride),
-                    const SizedBox(height: 16),
-                    _buildDriverCard(ride),
-                    if (isDriver) ...[
-                      const SizedBox(height: 16),
-                      _buildRequestsSection(ride),
-                    ],
-                    if (ride.stops.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _buildStopsCard(ride),
-                    ],
-                    const SizedBox(height: 30),
-                  ]),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-      bottomNavigationBar: StreamBuilder<Ride?>(
-        stream: FirestoreService.getRideStream(widget.rideId),
-        builder: (context, snapshot) {
-          final ride = snapshot.data;
-          if (ride == null) return const SizedBox.shrink();
+          if (ride == null) return const Center(child: Text("Ride details not found"));
 
           final isDriver = ride.driverId == _currentUid;
           final isPassenger = ride.passengers.contains(_currentUid);
 
-          return _buildBottomBar(ride, isDriver, isPassenger);
+          return Stack(
+            children: [
+              SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(ride),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 160),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLocationCard(ride),
+                          const SizedBox(height: 32),
+                          _buildGridSpecs(ride),
+                          const SizedBox(height: 32),
+                          _buildHostSection(ride),
+                          if (isDriver) ...[
+                            const SizedBox(height: 32),
+                            _buildDriverRequests(ride),
+                          ],
+                          if (ride.stops.isNotEmpty) ...[
+                            const SizedBox(height: 32),
+                            _buildStopoverList(ride),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _buildBottomActionPanel(ride, isDriver, isPassenger),
+            ],
+          );
         },
       ),
     );
   }
 
   // ───────────────────────────────────────────────────────
-  //  HEADER
+  //  PREMIUM BLUE HEADER
   // ───────────────────────────────────────────────────────
 
   Widget _buildHeader(Ride ride) {
-    final formattedDate = DateFormat('EEEE, MMM dd').format(ride.departureTime);
-    final formattedTime = DateFormat('hh:mm a').format(ride.departureTime);
-
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 110, 24, 40),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2E7CF6), Color(0xFF4AC7FA)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [kPrimary, Color(0xFF1E40AF)], // Sophisticated Blue Gradient
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(36),
-          bottomRight: Radius.circular(36),
+          bottomLeft: Radius.circular(48),
+          bottomRight: Radius.circular(48),
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                    ),
-                  ),
-                  const Spacer(),
-                  _buildStatusBadge(ride.status),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      ride.vehicleType == VehicleType.bike
-                          ? Icons.two_wheeler_rounded
-                          : Icons.directions_car_filled_rounded,
-                      color: Colors.white, size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ride.vehicleType == VehicleType.bike ? "Bike Ride" : "Car Ride",
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          "$formattedDate • $formattedTime",
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13, fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  _headerStat(Icons.event_seat_rounded, "${ride.seatsAvailable}/${ride.seatsTotal} seats"),
-                  const SizedBox(width: 16),
-                  _headerStat(Icons.attach_money_rounded, "৳${ride.pricePerSeat.toInt()}/seat"),
-                  const SizedBox(width: 16),
-                  _headerStat(Icons.people_rounded, "${ride.passengers.length} booked"),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusBadge(String status) {
-    Color color;
-    String label;
-    switch (status) {
-      case 'active':
-        color = kGreen;
-        label = 'Active';
-        break;
-      case 'full':
-        color = const Color(0xFFF59E0B);
-        label = 'Full';
-        break;
-      case 'in_progress':
-        color = kPrimary;
-        label = 'In Progress';
-        break;
-      case 'cancelled':
-        color = kRed;
-        label = 'Cancelled';
-        break;
-      case 'completed':
-        color = kTextSecondary;
-        label = 'Completed';
-        break;
-      default:
-        color = kTextSecondary;
-        label = status;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: GoogleFonts.plusJakartaSans(
-        fontSize: 12, fontWeight: FontWeight.w800, color: color,
-      )),
-    );
-  }
-
-  Widget _headerStat(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(text, style: GoogleFonts.plusJakartaSans(
-            fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white,
-          )),
-        ],
-      ),
-    );
-  }
-
-  // ───────────────────────────────────────────────────────
-  //  ROUTE CARD
-  // ───────────────────────────────────────────────────────
-
-  Widget _buildRouteCard(Ride ride) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(24),
-      decoration: _cardDeco(),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            children: [
-              const SizedBox(height: 4),
-              _dot(kPrimary),
-              _line(40),
-              _dot(kRed),
-            ],
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("PICKUP", style: _labelStyle()),
-                const SizedBox(height: 4),
-                Text(ride.origin, style: _valueStyle()),
-                const SizedBox(height: 26),
-                Text("DROP-OFF", style: _labelStyle()),
-                const SizedBox(height: 4),
-                Text(ride.destination, style: _valueStyle()),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ───────────────────────────────────────────────────────
-  //  INFO GRID
-  // ───────────────────────────────────────────────────────
-
-  Widget _buildRideInfoGrid(Ride ride) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Expanded(child: _infoTile(Icons.people_outline_rounded, "Gender Pref", ride.genderPreference)),
-          const SizedBox(width: 12),
-          Expanded(child: _infoTile(Icons.approval_rounded, "Booking", ride.instantMatch ? "Instant \u26A1" : "Driver Approves")),
-          const SizedBox(width: 12),
-          Expanded(child: _infoTile(Icons.directions_car_outlined, "Vehicle", ride.vehicleModel)),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoTile(IconData icon, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _cardDeco(),
-      child: Column(
-        children: [
-          Icon(icon, size: 22, color: kPrimary),
-          const SizedBox(height: 8),
-          Text(label, style: GoogleFonts.plusJakartaSans(
-            fontSize: 10, fontWeight: FontWeight.w700, color: kTextSecondary, letterSpacing: 0.5,
-          )),
-          const SizedBox(height: 4),
-          Text(value, style: GoogleFonts.plusJakartaSans(
-            fontSize: 12, fontWeight: FontWeight.w800, color: kTextPrimary,
-          ), textAlign: TextAlign.center),
-        ],
-      ),
-    );
-  }
-
-  // ───────────────────────────────────────────────────────
-  //  DRIVER CARD
-  // ───────────────────────────────────────────────────────
-
-  Widget _buildDriverCard(Ride ride) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: _cardDeco(),
-      child: Row(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: kPrimary.withOpacity(0.2), width: 2),
-            ),
-            child: CircleAvatar(
-              radius: 24,
-              backgroundColor: kPrimary.withOpacity(0.08),
-              child: Text(
-                ride.driverName.isNotEmpty ? ride.driverName[0].toUpperCase() : '?',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20, fontWeight: FontWeight.w800, color: kPrimary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  ride.driverName.isNotEmpty ? ride.driverName : 'Unknown Driver',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 16),
-                    const SizedBox(width: 4),
-                    Text("5.0", style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13, fontWeight: FontWeight.w700, color: kTextSecondary,
-                    )),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: kGreen.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text("Verified", style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10, fontWeight: FontWeight.w700, color: kGreen,
-                      )),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ───────────────────────────────────────────────────────
-  //  STOPS CARD
-  // ───────────────────────────────────────────────────────
-
-  Widget _buildStopsCard(Ride ride) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: _cardDeco(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("STOPOVERS", style: _labelStyle()),
-          const SizedBox(height: 12),
-          ...ride.stops.map((stop) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+          Row(
+            children: [
+              _headerTag(ride.vehicleType == VehicleType.bike ? "BIKE" : "CAR"),
+              const SizedBox(width: 12),
+              _headerTag(ride.status.toUpperCase(), isStatus: true, status: ride.status),
+            ],
+          ),
+          const SizedBox(height: 20),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
             child: Row(
               children: [
-                _dot(const Color(0xFFF59E0B)),
-                const SizedBox(width: 14),
-                Text(stop, style: _valueStyle()),
-              ],
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  // ───────────────────────────────────────────────────────
-  //  REQUESTS SECTION (DRIVER VIEW)
-  // ───────────────────────────────────────────────────────
-
-  Widget _buildRequestsSection(Ride ride) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: _cardDeco(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.inbox_rounded, size: 20, color: kPrimary),
-              const SizedBox(width: 10),
-              Text("Ride Requests", style: GoogleFonts.plusJakartaSans(
-                fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary,
-              )),
-            ],
-          ),
-          const SizedBox(height: 16),
-          StreamBuilder<List<RideRequest>>(
-            stream: FirestoreService.getRequestsForRide(widget.rideId),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2),
-                ));
-              }
-              final requests = snapshot.data ?? [];
-              if (requests.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(Icons.hourglass_empty_rounded, size: 32, color: Colors.grey.shade300),
-                        const SizedBox(height: 8),
-                        Text("Nothing yet",
-                          style: GoogleFonts.plusJakartaSans(
-                            color: kTextSecondary, fontSize: 14, fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text("Requests will appear here",
-                          style: GoogleFonts.plusJakartaSans(
-                            color: Colors.grey.shade400, fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-              return Column(
-                children: requests.map((req) => _buildRequestTile(req)).toList(),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRequestTile(RideRequest req) {
-    final isPending = req.status == 'pending';
-
-    Color statusColor;
-    String statusLabel;
-    switch (req.status) {
-      case 'accepted':
-        statusColor = kGreen;
-        statusLabel = 'Accepted';
-        break;
-      case 'rejected':
-        statusColor = kRed;
-        statusLabel = 'Rejected';
-        break;
-      case 'cancelled':
-        statusColor = kTextSecondary;
-        statusLabel = 'Cancelled';
-        break;
-      default:
-        statusColor = const Color(0xFFF59E0B);
-        statusLabel = 'Pending';
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: kPrimary.withOpacity(0.1),
-                child: Text(
-                  req.passengerName.isNotEmpty ? req.passengerName[0].toUpperCase() : '?',
+                Text(
+                  ride.origin,
                   style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w800, color: kPrimary, fontSize: 14,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      req.passengerName.isNotEmpty ? req.passengerName : 'Passenger',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w700, fontSize: 14, color: kTextPrimary,
-                      ),
-                    ),
-                    Text(
-                      "${req.seatsRequested} seat${req.seatsRequested > 1 ? 's' : ''} requested",
-                      style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTextSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(statusLabel, style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11, fontWeight: FontWeight.w700, color: statusColor,
-                )),
-              ),
-            ],
-          ),
-          if (isPending) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _handleReject(req.id!),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: kRed),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    child: Text("Reject", style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w700, color: kRed, fontSize: 13,
-                    )),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => _handleAccept(req.id!),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kGreen,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    child: Text("Accept", style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w700, color: Colors.white, fontSize: 13,
-                    )),
+                Icon(Icons.route_rounded, color: Colors.white.withOpacity(0.6), size: 28),
+                const SizedBox(width: 12),
+                Text(
+                  ride.destination,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ],
             ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ───────────────────────────────────────────────────────
-  //  BOTTOM BAR
-  // ───────────────────────────────────────────────────────
-
-  Widget _buildBottomBar(Ride ride, bool isDriver, bool isPassenger) {
-    final isCancelled = ride.status == 'cancelled';
-    final isCompleted = ride.status == 'completed';
-    final isInProgress = ride.status == 'in_progress';
-    final isFull = ride.status == 'full';
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))],
-      ),
-      child: Row(
-        children: [
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          const SizedBox(height: 16),
+          Row(
             children: [
-              Text("Per Seat", style: GoogleFonts.plusJakartaSans(
-                fontSize: 11, fontWeight: FontWeight.w600, color: kTextSecondary,
-              )),
-              Text("৳${ride.pricePerSeat.toInt()}", style: GoogleFonts.plusJakartaSans(
-                fontSize: 24, fontWeight: FontWeight.w900, color: kTextPrimary,
-              )),
+              const Icon(Icons.calendar_today_rounded, size: 14, color: Colors.white70),
+              const SizedBox(width: 8),
+              Text(
+                DateFormat('EEE, MMM dd • hh:mm a').format(ride.departureTime),
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white70,
+                ),
+              ),
             ],
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Builder(builder: (_) {
-              if (isCancelled) {
-                return _actionButton("Ride Cancelled", null, kTextSecondary);
-              }
-              if (isCompleted) {
-                return _actionButton("Ride Completed", null, kTextSecondary);
-              }
-
-              if (isDriver) {
-                if (isInProgress) {
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: _actionButton("View Ride", () {
-                          Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => OngoingRideScreen(rideId: ride.id!),
-                          ));
-                        }, kPrimary),
-                      ),
-                    ],
-                  );
-                }
-                // Driver can start ride if there are passengers
-                if (ride.passengers.isNotEmpty) {
-                  return Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: _actionButton("Start Ride", () => _handleStartRide(ride), kGreen),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _actionButton("Cancel", () => _showCancelRideDialog(ride), kRed),
-                      ),
-                    ],
-                  );
-                }
-                return _actionButton("Cancel Ride", () => _showCancelRideDialog(ride), kRed);
-              }
-
-              if (isPassenger) {
-                if (isInProgress) {
-                  return _actionButton("View Ride", () {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => OngoingRideScreen(rideId: ride.id!),
-                    ));
-                  }, kPrimary);
-                }
-                return _actionButton("Cancel Booking", () => _showCancelBookingDialog(ride), kRed);
-              }
-
-              if (isFull) {
-                return _actionButton("Ride Full", null, kTextSecondary);
-              }
-
-              if (ride.driverId == _currentUid) {
-                return _actionButton("Your Ride", null, kTextSecondary);
-              }
-
-              return _actionButton(
-                _isRequesting
-                    ? "Booking..."
-                    : (ride.instantMatch ? "Book Instantly \u26A1" : "Request Seat"),
-                _isRequesting ? null : () => _handleRequest(ride),
-                kPrimary,
-              );
-            }),
-          ),
         ],
       ),
     );
   }
 
-  Widget _actionButton(String text, VoidCallback? onTap, Color color) {
-    return SizedBox(
-      height: 54,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          disabledBackgroundColor: color.withOpacity(0.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 0,
+  Widget _headerTag(String label, {bool isStatus = false, String status = ''}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isStatus ? Colors.white.withOpacity(0.2) : Colors.white10,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isStatus ? Colors.white.withOpacity(0.3) : Colors.white10),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.plusJakartaSans(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1,
         ),
-        child: _isRequesting && (text == "Booking..." || text == "Requesting...")
-            ? const SizedBox(width: 22, height: 22,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-            : Text(text, style: GoogleFonts.plusJakartaSans(
-                fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white,
-              )),
       ),
     );
   }
 
   // ───────────────────────────────────────────────────────
-  //  ACTIONS
+  //  LOCATION CARD
   // ───────────────────────────────────────────────────────
 
-  Future<void> _handleRequest(Ride ride) async {
-    if (ride.driverId == _currentUid) {
-      _showSnack("You can't book your own ride.", false);
-      return;
+  Widget _buildLocationCard(Ride ride) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [BoxShadow(color: kTextMain.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 8))],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Column(
+              children: [
+                const Icon(Icons.trip_origin_rounded, color: kAccent, size: 20),
+                Expanded(
+                  child: Container(
+                    width: 1.5,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    decoration: BoxDecoration(
+                      color: kBorder,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+                const Icon(Icons.location_on_rounded, color: kPrimary, size: 20),
+              ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Departure Point", style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(ride.origin, style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.bold, color: kTextMain)),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Destination", style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(ride.destination, style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.bold, color: kTextMain)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────
+  //  SPECS GRID
+  // ───────────────────────────────────────────────────────
+
+  Widget _buildGridSpecs(Ride ride) {
+    return Row(
+      children: [
+        _specItem(Icons.airline_seat_recline_extra_rounded, ride.seatsAvailable.toString(), "Seats"),
+        _specDivider(),
+        _specItem(Icons.wc_rounded, ride.genderPreference, "Gender"),
+        _specDivider(),
+        _specItem(ride.instantMatch ? Icons.bolt_rounded : Icons.approval_rounded, ride.instantMatch ? "Instant" : "Review", "Match"),
+      ],
+    );
+  }
+
+  Widget _specDivider() => Container(width: 1, height: 30, color: kTextSub.withOpacity(0.1));
+
+  Widget _specItem(IconData icon, String val, String label) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: kAccent.withOpacity(0.8)),
+          const SizedBox(height: 8),
+          Text(val, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w800, color: kTextMain)),
+          Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: kTextSub)),
+        ],
+      ),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────
+  //  HOST SECTION
+  // ───────────────────────────────────────────────────────
+
+  Widget _buildHostSection(Ride ride) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 26,
+          backgroundColor: kPrimary.withOpacity(0.05),
+          child: Text(ride.driverName[0].toUpperCase(), style: const TextStyle(color: kPrimary, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(ride.driverName, style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: kTextMain)),
+              Row(
+                children: [
+                  const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                  const SizedBox(width: 4),
+                  Text("5.0", style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: kTextMain)),
+                  const SizedBox(width: 8),
+                  Text("Verified Host", style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: kSuccess)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: kAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+          child: const Icon(Icons.chat_bubble_rounded, color: kAccent, size: 20),
+        ),
+      ],
+    );
+  }
+
+  // ───────────────────────────────────────────────────────
+  //  DRIVER REQUESTS
+  // ───────────────────────────────────────────────────────
+
+  Widget _buildDriverRequests(Ride ride) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Rider Requests", style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: kTextMain)),
+        const SizedBox(height: 16),
+        StreamBuilder<List<RideRequest>>(
+          stream: FirestoreService.getRequestsForRide(widget.rideId),
+          builder: (context, snapshot) {
+            final requests = snapshot.data ?? [];
+            if (requests.isEmpty) return _emptyRequests();
+            return Column(children: requests.map((req) => _requestRow(req)).toList());
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _emptyRequests() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(20)),
+    child: Center(child: Text("No requests yet", style: GoogleFonts.plusJakartaSans(color: kTextSub, fontSize: 13))),
+  );
+
+  Widget _requestRow(RideRequest req) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: kTextSub.withOpacity(0.05))),
+      child: Row(
+        children: [
+          CircleAvatar(radius: 16, backgroundColor: kAccent.withOpacity(0.1), child: Text(req.passengerName[0], style: const TextStyle(fontSize: 12, color: kAccent))),
+          const SizedBox(width: 12),
+          Expanded(child: Text(req.passengerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+          if (req.status == 'pending') ...[
+            _actionBtn(Icons.close, kError, () => _handleReject(req.id!)),
+            const SizedBox(width: 8),
+            _actionBtn(Icons.check, kSuccess, () => _handleAccept(req.id!)),
+          ] else
+            Text(req.status.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: kTextSub)),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionBtn(IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, size: 16, color: color)),
+    );
+  }
+
+  // ───────────────────────────────────────────────────────
+  //  STOPOVERS
+  // ───────────────────────────────────────────────────────
+
+  Widget _buildStopoverList(Ride ride) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Planned Stops", style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: kTextMain)),
+        const SizedBox(height: 12),
+        ...ride.stops.map((stop) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.location_on_rounded, size: 14, color: kAccent),
+              const SizedBox(width: 12),
+              Text(stop, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600, color: kTextMain)),
+            ],
+          ),
+        )),
+      ],
+    );
+  }
+
+  // ───────────────────────────────────────────────────────
+  //  ACTION PANEL
+  // ───────────────────────────────────────────────────────
+
+  Widget _buildBottomActionPanel(Ride ride, bool isDriver, bool isPassenger) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+        decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          boxShadow: [BoxShadow(color: kTextMain.withOpacity(0.06), blurRadius: 24, offset: const Offset(0, -8))],
+        ),
+        child: Row(
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("TOTAL COST", style: GoogleFonts.plusJakartaSans(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                Text("৳${ride.pricePerSeat.toInt()}", style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w900, color: kTextMain)),
+              ],
+            ),
+            const SizedBox(width: 32),
+            Expanded(child: _buildPrimaryBtn(ride, isDriver, isPassenger)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryBtn(Ride ride, bool isDriver, bool isPassenger) {
+    if (ride.status == 'cancelled') return _disabledTag("CANCELLED", kError);
+    if (ride.status == 'completed') return _disabledTag("COMPLETED", kTextSub);
+
+    if (isDriver) {
+      if (ride.status == 'in_progress') return _actionBtnLarge("ONGOING TRIP", () => Navigator.push(context, MaterialPageRoute(builder: (_) => OngoingRideScreen(rideId: ride.id!))), kAccent);
+      if (ride.passengers.isNotEmpty) return _actionBtnLarge("START TRIP", () => _handleStartRide(ride), kSuccess);
+      return _actionBtnLarge("CANCEL TRIP", () => _showCancelRideDialog(ride), kError);
     }
+
+    if (isPassenger) {
+      if (ride.status == 'in_progress') return _actionBtnLarge("TRACK TRIP", () => Navigator.push(context, MaterialPageRoute(builder: (_) => OngoingRideScreen(rideId: ride.id!))), kAccent);
+      return _actionBtnLarge("CANCEL BOOKING", () => _showCancelBookingDialog(ride), kError);
+    }
+
+    if (ride.status == 'full') return _disabledTag("FULL", kTextSub);
+
+    return _actionBtnLarge(_isRequesting ? "SENDING..." : (ride.instantMatch ? "BOOK NOW" : "REQUEST SEAT"), _isRequesting ? null : () => _handleRequest(ride), kAccent);
+  }
+
+  Widget _actionBtnLarge(String label, VoidCallback? onTap, Color color) {
+    return ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        minimumSize: const Size(double.infinity, 56),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      child: Text(label, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5)),
+    );
+  }
+
+  Widget _disabledTag(String label, Color color) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
+      child: Center(
+        child: Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(color: color, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1),
+        ),
+      ),
+    );
+  }
+
+  // LOGIC
+  Color _getStatusColor(String s) => s == 'active' ? kSuccess : (s == 'full' ? Color(0xFFF59E0B) : kError);
+
+  Future<void> _handleRequest(Ride ride) async {
     setState(() => _isRequesting = true);
     final result = await FirestoreService.requestRide(rideId: ride.id!);
     setState(() => _isRequesting = false);
@@ -764,157 +514,17 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   }
 
   Future<void> _handleStartRide(Ride ride) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Start Ride?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
-        content: Text(
-          "Starting the ride will reject any remaining pending requests. ${ride.passengers.length} passenger${ride.passengers.length > 1 ? 's' : ''} will be notified.",
-          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text("Not Yet", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: kTextSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: Text("Start", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      final result = await FirestoreService.startRide(ride.id!);
-      if (mounted) {
-        _showSnack(result.message, result.success);
-        if (result.success) {
-          Navigator.pushReplacement(context, MaterialPageRoute(
-            builder: (_) => OngoingRideScreen(rideId: ride.id!),
-          ));
-        }
-      }
-    }
+    final res = await FirestoreService.startRide(ride.id!);
+    if (res.success && mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => OngoingRideScreen(rideId: ride.id!)));
   }
 
   void _showCancelRideDialog(Ride ride) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Cancel Ride?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
-        content: Text(
-          "This will cancel the ride and all existing bookings. This cannot be undone.",
-          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("Keep", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: kTextSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final result = await FirestoreService.cancelRide(ride.id!);
-              if (mounted) _showSnack(result.message, result.success);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kRed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: Text("Cancel Ride", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text("Cancel this trip?"), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("No")), ElevatedButton(onPressed: () { Navigator.pop(ctx); FirestoreService.cancelRide(ride.id!); }, child: const Text("Yes"))]));
   }
 
   void _showCancelBookingDialog(Ride ride) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Cancel Booking?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
-        content: Text(
-          "Your seat will be released and someone else may take it.",
-          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("Keep", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: kTextSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final requests = await FirestoreService.getRequestsForRide(ride.id!).first;
-              final myReq = requests.where(
-                (r) => r.passengerId == _currentUid && (r.status == 'accepted' || r.status == 'pending'),
-              ).firstOrNull;
-              if (myReq != null) {
-                final result = await FirestoreService.cancelBooking(myReq.id!);
-                if (mounted) _showSnack(result.message, result.success);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kRed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: Text("Cancel", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text("Cancel your booking?"), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("No")), ElevatedButton(onPressed: () async { Navigator.pop(ctx); final requests = await FirestoreService.getRequestsForRide(ride.id!).first; final myReq = requests.where((r) => r.passengerId == _currentUid && (r.status == 'accepted' || r.status == 'pending')).firstOrNull; if (myReq != null) FirestoreService.cancelBooking(myReq.id!); }, child: const Text("Cancel"))]));
   }
 
-  void _showSnack(String message, bool success) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
-      backgroundColor: success ? kGreen : kRed,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
-    ));
-  }
-
-  // ───────────────────────────────────────────────────────
-  //  HELPERS
-  // ───────────────────────────────────────────────────────
-
-  BoxDecoration _cardDeco() => BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(24),
-    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 8))],
-  );
-
-  TextStyle _labelStyle() => GoogleFonts.plusJakartaSans(
-    fontSize: 10, fontWeight: FontWeight.w800, color: kTextSecondary, letterSpacing: 1.2,
-  );
-
-  TextStyle _valueStyle() => GoogleFonts.plusJakartaSans(
-    fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary,
-  );
-
-  Widget _dot(Color color) => Container(
-    width: 12, height: 12,
-    decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-    child: Center(child: Container(
-      width: 6, height: 6,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    )),
-  );
-
-  Widget _line(double h) => Container(
-    width: 2, height: h,
-    decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(1)),
-  );
+  void _showSnack(String m, bool s) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), backgroundColor: s ? kSuccess : kError, behavior: SnackBarBehavior.floating, margin: const EdgeInsets.all(20)));
 }

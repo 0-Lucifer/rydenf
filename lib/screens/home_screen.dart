@@ -9,6 +9,7 @@ import '../services/firestore_service.dart';
 import 'offer_ride_screen.dart';
 import 'available_rides.dart';
 import 'notifications_screen.dart';
+import 'group_rides_screen.dart';
 
 class RydenHome extends StatefulWidget {
   const RydenHome({super.key});
@@ -230,8 +231,8 @@ class _RydenHomeState extends State<RydenHome> {
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
     child: Row(children: [
       ActionTile(
-        label: "Find", 
-        icon: Icons.search_rounded, 
+        label: "Find",
+        icon: Icons.search_rounded,
         color: const Color(0xFF2E7CF6),
         onTap: () {
           Navigator.push(
@@ -242,8 +243,8 @@ class _RydenHomeState extends State<RydenHome> {
       ),
       const SizedBox(width: 12),
       ActionTile(
-        label: "Offer", 
-        icon: Icons.add_circle_outline, 
+        label: "Offer",
+        icon: Icons.add_circle_outline,
         color: const Color(0xFF00BFA5),
         onTap: () {
           Navigator.push(
@@ -253,7 +254,17 @@ class _RydenHomeState extends State<RydenHome> {
         },
       ),
       const SizedBox(width: 12),
-      const ActionTile(label: "Group", icon: Icons.groups_rounded, color: Color(0xFFFD6B6B)),
+      ActionTile(
+        label: "Group",
+        icon: Icons.groups_rounded,
+        color: const Color(0xFFFD6B6B),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const GroupRidesScreen()),
+          );
+        },
+      ),
     ]),
   );
 
@@ -317,7 +328,7 @@ class _RydenHomeState extends State<RydenHome> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-        if (showAll) 
+        if (showAll)
           GestureDetector(
             onTap: () {
               Navigator.push(
