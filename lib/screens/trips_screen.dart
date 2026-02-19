@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'dart:ui';
 import '../models/ride_model.dart';
 import '../models/ride_request_model.dart';
 import '../services/firestore_service.dart';
@@ -15,9 +16,13 @@ class TripsScreen extends StatefulWidget {
 }
 
 class _TripsScreenState extends State<TripsScreen> with SingleTickerProviderStateMixin {
-  static const Color kPrimary = Color(0xFF2E7CF6);
-  static const Color kTextPrimary = Color(0xFF0F172A);
-  static const Color kTextSecondary = Color(0xFF64748B);
+  // --- Premium Design System Tokens ---
+  static const Color kAccent = Color(0xFF2E7CF6); // Premium Blue
+  static const Color kPrimary = Color(0xFF0F172A); // Slate 900
+  static const Color kSecondary = Color(0xFF64748B); // Slate 500
+  static const Color kSuccess = Color(0xFF10B981); // Emerald 500
+  static const Color kDanger = Color(0xFFF43F5E); // Rose 500
+  static const Color kBackground = Color(0xFFF8FAFC); // Slate 50
 
   late TabController _tabController;
 
@@ -35,17 +40,386 @@ class _TripsScreenState extends State<TripsScreen> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF020617) : kBackground;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: Column(
+      backgroundColor: bgColor,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final double horizontalPadding = constraints.maxWidth > 1024
+              ? (constraints.maxWidth - 1000) / 2
+              : constraints.maxWidth > 600 ? 40 : 16;
+
+          return Stack(
+            children: [
+              if (!isDark) ...[
+                _buildAmbientBlob(kAccent.withOpacity(0.05), 300, -80, -80),
+                _buildAmbientBlob(kSuccess.withOpacity(0.03), 250, 200, null, right: -60),
+              ],
+
+              SafeArea(
+                child: NestedScrollView(
+                  headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                    _buildPremiumHeader(isDark, horizontalPadding),
+                    _buildStickyTabBar(isDark, horizontalPadding),
+                  ],
+                  body: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildOffersList(isDark, horizontalPadding),
+                      _buildBookingsList(isDark, horizontalPadding),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAmbientBlob(Color color, double size, double? top, double? left, {double? right, double? bottom}) {
+    return Positioned(
+      top: top, left: left, right: right, bottom: bottom,
+      child: Container(
+        width: size, height: size,
+        decoration: BoxDecoration(
+          color: color, shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 100, spreadRadius: 50)],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPremiumHeader(bool isDark, double horizontalPadding) {
+    return SliverAppBar(
+      expandedHeight: 120,
+      collapsedHeight: 70,
+      pinned: true,
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding + 8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "My Trips",
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 32, fontWeight: FontWeight.w900,
+                  color: isDark ? Colors.white : kPrimary,
+                  letterSpacing: -1.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                "Keep track of your shared journeys",
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14, color: kSecondary, fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStickyTabBar(bool isDark, double horizontalPadding) {
+    return SliverPersistentHeader(
+      pinned: true,
+      delegate: _SliverAppBarDelegate(
+        minHeight: 68, maxHeight: 68,
+        child: ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              color: isDark ? const Color(0xFF020617).withOpacity(0.8) : kBackground.withOpacity(0.8),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE2E8F0).withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: isDark ? kAccent : Colors.white,
+                    boxShadow: isDark ? [] : [
+                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))
+                    ],
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  labelColor: isDark ? Colors.white : kAccent,
+                  unselectedLabelColor: kSecondary,
+                  labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 13),
+                  unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13),
+                  tabs: const [Tab(text: "My Offers"), Tab(text: "My Bookings")],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOffersList(bool isDark, double horizontalPadding) {
+    return StreamBuilder<List<Ride>>(
+      stream: FirestoreService.getUserRidesStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: kAccent, strokeWidth: 3));
+        }
+        final rides = snapshot.data ?? [];
+        if (rides.isEmpty) return _buildEmptyState(Icons.directions_car_rounded, "No Offers Yet", "Rides you publish will appear here.", isDark);
+
+        return ListView.builder(
+          padding: EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 100),
+          physics: const BouncingScrollPhysics(),
+          itemCount: rides.length,
+          itemBuilder: (context, index) => _StaggeredAnimation(
+            index: index,
+            child: _PremiumTripCard(ride: rides[index], isDark: isDark),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBookingsList(bool isDark, double horizontalPadding) {
+    return StreamBuilder<List<RideRequest>>(
+      stream: FirestoreService.getMyBookingsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: kAccent, strokeWidth: 3));
+        }
+        final bookings = snapshot.data ?? [];
+        if (bookings.isEmpty) return _buildEmptyState(Icons.bookmark_outline_rounded, "No Bookings", "The trips you join will be listed here.", isDark);
+
+        return ListView.builder(
+          padding: EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 100),
+          physics: const BouncingScrollPhysics(),
+          itemCount: bookings.length,
+          itemBuilder: (context, index) => _StaggeredAnimation(
+            index: index,
+            child: _PremiumBookingCard(request: bookings[index], isDark: isDark),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(IconData icon, String title, String subtitle, bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildHeader(),
+          Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(color: kAccent.withOpacity(0.05), shape: BoxShape.circle),
+            child: Icon(icon, size: 64, color: kAccent.withOpacity(0.2)),
+          ),
+          const SizedBox(height: 24),
+          Text(title, style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : kPrimary)),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(subtitle, textAlign: TextAlign.center, style: GoogleFonts.plusJakartaSans(fontSize: 14, color: kSecondary, height: 1.5)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Enhanced Animation ---
+class _StaggeredAnimation extends StatelessWidget {
+  final int index;
+  final Widget child;
+  const _StaggeredAnimation({required this.index, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder(
+      duration: Duration(milliseconds: 400 + (index * 80)),
+      tween: Tween<double>(begin: 0, end: 1),
+      curve: Curves.easeOutQuart,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(offset: Offset(0, 20 * (1 - value)), child: child),
+      ),
+      child: child,
+    );
+  }
+}
+
+// --- Redesigned Premium Trip Card (Offers) ---
+class _PremiumTripCard extends StatelessWidget {
+  final Ride ride;
+  final bool isDark;
+  const _PremiumTripCard({required this.ride, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr = DateFormat('EEE, MMM dd').format(ride.departureTime);
+    final timeStr = DateFormat('hh:mm a').format(ride.departureTime);
+    final status = _getStatus(ride.status);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(isDark ? 0.3 : 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          )
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Floating Status Badge
+          Positioned(
+            top: 16,
+            right: 16,
+            child: _StatusBadge(label: status.label, color: status.color),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: () {
+                if (ride.id == null) return;
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => ride.status == 'in_progress' ? OngoingRideScreen(rideId: ride.id!) : RideDetailScreen(rideId: ride.id!),
+                ));
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 8), // Room for badge
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _VehicleIcon(type: ride.vehicleType),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildJourneyTimeline(isDark),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const SizedBox(height: 24), // Offset for badge above
+                            Text(
+                              "৳${ride.pricePerSeat.toInt()}",
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 24, fontWeight: FontWeight.w900,
+                                color: _TripsScreenState.kAccent, letterSpacing: -0.5,
+                              ),
+                            ),
+                            Text(
+                              "per seat",
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10, fontWeight: FontWeight.w700, color: _TripsScreenState.kSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _StatChip(Icons.calendar_today_rounded, dateStr, isDark),
+                          _StatChip(Icons.access_time_rounded, timeStr, isDark),
+                          _StatChip(Icons.people_alt_rounded, "${ride.seatsAvailable}/${ride.seatsTotal}", isDark),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJourneyTimeline(bool isDark) {
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: SizedBox(
+              width: 24,
+              child: Column(
+                children: [
+                  Icon(Icons.trip_origin_rounded, size: 14, color: _TripsScreenState.kAccent),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: CustomPaint(
+                        painter: _VerticalRouteCurvePainter(),
+                        child: const SizedBox(width: 24),
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.location_on_rounded, size: 14, color: _TripsScreenState.kDanger),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildMyOffers(),
-                _buildMyBookings(),
+                Text(
+                  ride.origin,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : _TripsScreenState.kPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  ride.destination,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : _TripsScreenState.kPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -54,563 +428,237 @@ class _TripsScreenState extends State<TripsScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
-        boxShadow: [BoxShadow(color: Color(0x08000000), blurRadius: 20, offset: Offset(0, 4))],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-              child: Row(
-                children: [
-                  Text("My Trips",
-                    style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800, color: kTextPrimary),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: TabBar(
-                controller: _tabController,
-                indicator: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(11),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))],
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerHeight: 0,
-                labelColor: kPrimary,
-                unselectedLabelColor: kTextSecondary,
-                labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 13),
-                unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13),
-                tabs: const [
-                  Tab(text: "My Offers"),
-                  Tab(text: "My Bookings"),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ───────────────────────────────────────────────────────
-  //  MY OFFERS TAB
-  // ───────────────────────────────────────────────────────
-
-  Widget _buildMyOffers() {
-    return StreamBuilder<List<Ride>>(
-      stream: FirestoreService.getUserRidesStream(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: kPrimary));
-        }
-
-        final rides = snapshot.data ?? [];
-        if (rides.isEmpty) {
-          return _emptyState(
-            Icons.directions_car_outlined,
-            "Nothing yet",
-            "Rides you offer will appear here",
-          );
-        }
-
-        return ListView.builder(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-          itemCount: rides.length,
-          itemBuilder: (context, index) => _buildOfferCard(rides[index]),
-        );
-      },
-    );
-  }
-
-  Widget _buildOfferCard(Ride ride) {
-    final formattedDate = DateFormat('EEE, MMM dd').format(ride.departureTime);
-    final formattedTime = DateFormat('hh:mm a').format(ride.departureTime);
-
-    Color statusColor;
-    String statusLabel;
-    switch (ride.status) {
-      case 'active':
-        statusColor = const Color(0xFF10B981);
-        statusLabel = 'Active';
-        break;
-      case 'full':
-        statusColor = const Color(0xFFF59E0B);
-        statusLabel = 'Full';
-        break;
-      case 'in_progress':
-        statusColor = kPrimary;
-        statusLabel = 'In Progress';
-        break;
-      case 'cancelled':
-        statusColor = const Color(0xFFEF4444);
-        statusLabel = 'Cancelled';
-        break;
-      case 'completed':
-        statusColor = kTextSecondary;
-        statusLabel = 'Completed';
-        break;
-      default:
-        statusColor = kPrimary;
-        statusLabel = ride.status;
+  _StatusData _getStatus(String s) {
+    switch (s) {
+      case 'active': return _StatusData("Active", const Color(0xFF10B981));
+      case 'full': return _StatusData("Full", const Color(0xFFF59E0B));
+      case 'in_progress': return _StatusData("On Route", const Color(0xFF2E7CF6));
+      case 'cancelled': return _StatusData("Cancelled", const Color(0xFFF43F5E));
+      default: return _StatusData("Completed", Colors.grey);
     }
+  }
+}
 
-    return GestureDetector(
-      onTap: () {
-        if (ride.id != null) {
-          if (ride.status == 'in_progress') {
-            Navigator.push(context, MaterialPageRoute(
-              builder: (_) => OngoingRideScreen(rideId: ride.id!),
-            ));
-          } else {
-            Navigator.push(context, MaterialPageRoute(
-              builder: (_) => RideDetailScreen(rideId: ride.id!),
-            ));
-          }
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 16, offset: const Offset(0, 6))],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: kPrimary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      ride.vehicleType == VehicleType.bike ? Icons.two_wheeler_rounded : Icons.directions_car_filled_rounded,
-                      color: kPrimary, size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("${ride.origin} → ${ride.destination}",
-                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14, color: kTextPrimary),
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text("$formattedDate • $formattedTime",
-                          style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTextSecondary, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(statusLabel, style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11, fontWeight: FontWeight.w800, color: statusColor,
-                    )),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  _statChip(Icons.event_seat_outlined, "${ride.seatsAvailable}/${ride.seatsTotal}"),
-                  const SizedBox(width: 10),
-                  _statChip(Icons.attach_money_rounded, "৳${ride.pricePerSeat.toInt()}"),
-                  const SizedBox(width: 10),
-                  _statChip(Icons.people_outline, "${ride.passengers.length} booked"),
-                  const Spacer(),
-                  Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey.shade300),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+// --- Vertical Route Curve Painter ---
+class _VerticalRouteCurvePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+
+    final gradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        const Color(0xFF3B82F6), // Blue
+        const Color(0xFF06B6D4), // Cyan
+        const Color(0xFF10B981), // Green
+        const Color(0xFFFBBF24), // Yellow
+        const Color(0xFFF97316), // Orange
+        const Color(0xFFEC4899), // Pink
+      ],
+    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    paint.shader = gradient;
+
+    final path = Path();
+    path.moveTo(size.width / 2, 0);
+    // Soft vertical bezier curve
+    path.cubicTo(
+        size.width, size.height * 0.25,
+        0, size.height * 0.75,
+        size.width / 2, size.height
     );
+
+    canvas.drawPath(path, paint);
   }
 
-  // ───────────────────────────────────────────────────────
-  //  MY BOOKINGS TAB
-  // ───────────────────────────────────────────────────────
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
 
-  Widget _buildMyBookings() {
-    return StreamBuilder<List<RideRequest>>(
-      stream: FirestoreService.getMyBookingsStream(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: kPrimary));
-        }
+// --- Redesigned Premium Booking Card ---
+class _PremiumBookingCard extends StatelessWidget {
+  final RideRequest request;
+  final bool isDark;
+  const _PremiumBookingCard({required this.request, required this.isDark});
 
-        final bookings = snapshot.data ?? [];
-        if (bookings.isEmpty) {
-          return _emptyState(
-            Icons.bookmark_border_rounded,
-            "Nothing yet",
-            "Rides you book will appear here",
-          );
-        }
+  @override
+  Widget build(BuildContext context) {
+    final status = _getStatus(request.status);
 
-        return ListView.builder(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-          itemCount: bookings.length,
-          itemBuilder: (context, index) => _BookingCard(booking: bookings[index]),
-        );
-      },
-    );
-  }
-
-  // ───────────────────────────────────────────────────────
-  //  SHARED WIDGETS
-  // ───────────────────────────────────────────────────────
-
-  Widget _emptyState(IconData icon, String title, String subtitle) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: kPrimary.withOpacity(0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 50, color: kPrimary.withOpacity(0.5)),
-          ),
-          const SizedBox(height: 20),
-          Text(title, style: GoogleFonts.plusJakartaSans(
-            fontSize: 18, fontWeight: FontWeight.w800, color: kTextPrimary,
-          )),
-          const SizedBox(height: 8),
-          Text(subtitle, style: GoogleFonts.plusJakartaSans(
-            fontSize: 14, color: kTextSecondary,
-          )),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF0F172A).withOpacity(isDark ? 0.3 : 0.05), blurRadius: 20, offset: const Offset(0, 8))
         ],
       ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () {
+            if (request.rideId != null) {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => RideDetailScreen(rideId: request.rideId!)));
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  height: 52, width: 52,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [status.color.withOpacity(0.12), status.color.withOpacity(0.04)],
+                      begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(child: Icon(Icons.bookmark_rounded, color: status.color, size: 24)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Ride Booking",
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12, fontWeight: FontWeight.w700,
+                          color: _TripsScreenState.kSecondary, letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "Ride from ${request.passengerName}",
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 16, fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : _TripsScreenState.kPrimary,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.airline_seat_recline_extra_rounded, size: 12, color: _TripsScreenState.kAccent),
+                          const SizedBox(width: 4),
+                          Text(
+                            "${request.seatsRequested} seat${request.seatsRequested > 1 ? 's' : ''} reserved",
+                            style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _TripsScreenState.kSecondary, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                _StatusBadge(label: status.label, color: status.color),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _statChip(IconData icon, String text) {
+  _StatusData _getStatus(String s) {
+    switch (s) {
+      case 'accepted': return _StatusData("Accepted", const Color(0xFF10B981));
+      case 'rejected': return _StatusData("Rejected", const Color(0xFFF43F5E));
+      case 'cancelled': return _StatusData("Cancelled", Colors.grey);
+      default: return _StatusData("Pending", const Color(0xFFF59E0B));
+    }
+  }
+}
+
+// --- Reusable Mini Components ---
+class _StatusBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _StatusBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(10),
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.15), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: kTextSecondary),
-          const SizedBox(width: 5),
-          Text(text, style: GoogleFonts.plusJakartaSans(
-            fontSize: 12, fontWeight: FontWeight.w700, color: kTextSecondary,
-          )),
+          Container(width: 5, height: 5, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text(
+            label.toUpperCase(),
+            style: GoogleFonts.plusJakartaSans(fontSize: 9, fontWeight: FontWeight.w900, color: color, letterSpacing: 0.4),
+          ),
         ],
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════
-//  BOOKING CARD
-// ═══════════════════════════════════════════════════════
-
-class _BookingCard extends StatefulWidget {
-  final RideRequest booking;
-  const _BookingCard({required this.booking});
-
-  @override
-  State<_BookingCard> createState() => _BookingCardState();
-}
-
-class _BookingCardState extends State<_BookingCard> {
-  static const Color kPrimary = Color(0xFF2E7CF6);
-  static const Color kTextPrimary = Color(0xFF0F172A);
-  static const Color kTextSecondary = Color(0xFF64748B);
-  static const Color kGreen = Color(0xFF10B981);
-  static const Color kRed = Color(0xFFEF4444);
-
-  Ride? _ride;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRide();
-  }
-
-  Future<void> _loadRide() async {
-    final ride = await FirestoreService.getRide(widget.booking.rideId);
-    if (mounted) {
-      setState(() {
-        _ride = ride;
-        _loading = false;
-      });
-    }
-  }
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool isDark;
+  const _StatChip(this.icon, this.text, this.isDark);
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        height: 100,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: const Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2)),
-      );
-    }
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: _TripsScreenState.kSecondary),
+        const SizedBox(width: 6),
+        Text(text, style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : _TripsScreenState.kPrimary)),
+      ],
+    );
+  }
+}
 
-    if (_ride == null) return const SizedBox.shrink();
+class _VehicleIcon extends StatelessWidget {
+  final VehicleType type;
+  const _VehicleIcon({required this.type});
 
-    final formattedDate = DateFormat('EEE, MMM dd').format(_ride!.departureTime);
-    final formattedTime = DateFormat('hh:mm a').format(_ride!.departureTime);
-
-    Color statusColor;
-    String statusLabel;
-    switch (widget.booking.status) {
-      case 'accepted':
-        statusColor = kGreen;
-        statusLabel = 'Confirmed';
-        break;
-      case 'rejected':
-        statusColor = kRed;
-        statusLabel = 'Rejected';
-        break;
-      case 'cancelled':
-        statusColor = kTextSecondary;
-        statusLabel = 'Cancelled';
-        break;
-      default:
-        statusColor = const Color(0xFFF59E0B);
-        statusLabel = 'Pending';
-    }
-
-    final canCancel = widget.booking.status == 'pending' || widget.booking.status == 'accepted';
-    final isInProgress = _ride!.status == 'in_progress';
-
-    return GestureDetector(
-      onTap: () {
-        if (isInProgress && widget.booking.status == 'accepted') {
-          Navigator.push(context, MaterialPageRoute(
-            builder: (_) => OngoingRideScreen(rideId: widget.booking.rideId),
-          ));
-        } else {
-          Navigator.push(context, MaterialPageRoute(
-            builder: (_) => RideDetailScreen(rideId: widget.booking.rideId),
-          ));
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 16, offset: const Offset(0, 6))],
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: kPrimary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          _ride!.vehicleType == VehicleType.bike ? Icons.two_wheeler_rounded : Icons.directions_car_filled_rounded,
-                          color: kPrimary, size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("${_ride!.origin} → ${_ride!.destination}",
-                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14, color: kTextPrimary),
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text("$formattedDate • $formattedTime",
-                              style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTextSecondary, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(statusLabel, style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11, fontWeight: FontWeight.w800, color: statusColor,
-                        )),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundColor: kPrimary.withOpacity(0.08),
-                        child: Text(
-                          _ride!.driverName.isNotEmpty ? _ride!.driverName[0].toUpperCase() : '?',
-                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 12, color: kPrimary),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _ride!.driverName.isNotEmpty ? _ride!.driverName : 'Driver',
-                        style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600, color: kTextSecondary),
-                      ),
-                      const Spacer(),
-                      Text("৳${_ride!.pricePerSeat.toInt()}",
-                        style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (isInProgress && widget.booking.status == 'accepted')
-              Container(
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => OngoingRideScreen(rideId: widget.booking.rideId),
-                    )),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.play_circle_filled_rounded, size: 18, color: Color(0xFF10B981)),
-                          const SizedBox(width: 6),
-                          Text("View Ongoing Ride", style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF10B981),
-                          )),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            else if (canCancel && !isInProgress)
-              Container(
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
-                    onTap: () => _showCancelDialog(),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.cancel_outlined, size: 16, color: kRed),
-                          const SizedBox(width: 6),
-                          Text("Cancel Booking", style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13, fontWeight: FontWeight.w700, color: kRed,
-                          )),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+  @override
+  Widget build(BuildContext context) {
+    final isBike = type == VehicleType.bike;
+    return Container(
+      height: 48, width: 48,
+      decoration: BoxDecoration(
+        color: _TripsScreenState.kAccent.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Icon(
+          isBike ? Icons.two_wheeler_rounded : Icons.directions_car_filled_rounded,
+          color: _TripsScreenState.kAccent, size: 24
       ),
     );
   }
+}
 
-  void _showCancelDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Cancel Booking?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
-        content: Text(
-          "Your seat will be released back for others.",
-          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("Keep", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: kTextSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final result = await FirestoreService.cancelBooking(widget.booking.id!);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(result.message, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  backgroundColor: result.success ? kGreen : kRed,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  margin: const EdgeInsets.all(16),
-                ));
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kRed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: Text("Cancel", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
+class _StatusData {
+  final String label;
+  final Color color;
+  _StatusData(this.label, this.color);
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate({required this.minHeight, required this.maxHeight, required this.child});
+  final double minHeight, maxHeight;
+  final Widget child;
+  @override double get minExtent => minHeight;
+  @override double get maxExtent => maxHeight;
+  @override Widget build(context, shrinkOffset, overlapsContent) => SizedBox.expand(child: child);
+  @override bool shouldRebuild(_SliverAppBarDelegate old) => maxHeight != old.maxHeight || minHeight != old.minHeight || child != old.child;
 }
