@@ -20,6 +20,19 @@ class FirestoreService {
   static const _profileCacheTTL = Duration(minutes: 5);
   static void clearProfileCache() => _profileCache.clear();
 
+  // ── Batch chunking helper (Firestore limit = 500 ops per batch) ──
+  static Future<void> _commitInChunks(List<void Function(WriteBatch)> ops) async {
+    const maxOps = 450; // leave headroom below Firestore's 500 limit
+    for (var i = 0; i < ops.length; i += maxOps) {
+      final batch = _db.batch();
+      final end = (i + maxOps > ops.length) ? ops.length : i + maxOps;
+      for (var j = i; j < end; j++) {
+        ops[j](batch);
+      }
+      await batch.commit();
+    }
+  }
+
   // ═══════════════════════════════════════════════════════
   //  USER PROFILE
   // ═══════════════════════════════════════════════════════
@@ -337,28 +350,33 @@ class FirestoreService {
       }
 
       if (isInstant) {
-        // ── INSTANT BOOKING: auto-accept ──
-        final batch = _db.batch();
+        // ── INSTANT BOOKING: transaction to prevent overbooking ──
+        final uid = _uid!;
+        await _db.runTransaction((txn) async {
+          final freshRide = await txn.get(_db.collection('rides').doc(rideId));
+          if (!freshRide.exists) throw Exception('Ride not found.');
+          final freshData = freshRide.data()!;
+          final freshSeats = freshData['seatsAvailable'] as int? ?? 0;
+          if (freshSeats < seatsRequested) throw Exception('Not enough seats.');
 
-        final request = RideRequest(
-          rideId: rideId,
-          passengerId: _uid!,
-          passengerName: passengerName,
-          seatsRequested: seatsRequested,
-          status: 'accepted',
-        );
-        final reqRef = _db.collection('ride_requests').doc();
-        batch.set(reqRef, request.toMap());
+          final request = RideRequest(
+            rideId: rideId,
+            passengerId: uid,
+            passengerName: passengerName,
+            seatsRequested: seatsRequested,
+            status: 'accepted',
+          );
+          final reqRef = _db.collection('ride_requests').doc();
+          txn.set(reqRef, request.toMap());
 
-        final newSeats = seatsAvailable - seatsRequested;
-        final updates = <String, dynamic>{
-          'seatsAvailable': newSeats,
-          'passengers': FieldValue.arrayUnion([_uid]),
-        };
-        if (newSeats <= 0) updates['status'] = 'full';
-        batch.update(_db.collection('rides').doc(rideId), updates);
-
-        await batch.commit();
+          final newSeats = freshSeats - seatsRequested;
+          final updates = <String, dynamic>{
+            'seatsAvailable': newSeats,
+            'passengers': FieldValue.arrayUnion([uid]),
+          };
+          if (newSeats <= 0) updates['status'] = 'full';
+          txn.update(freshRide.reference, updates);
+        });
 
         // Notify passenger about instant confirmation
         final origin = rideData['origin'] ?? '';
@@ -670,11 +688,10 @@ class FirestoreService {
           .where('isRead', isEqualTo: false)
           .get();
       if (unread.docs.isEmpty) return;
-      final batch = _db.batch();
-      for (final doc in unread.docs) {
-        batch.update(doc.reference, {'isRead': true});
-      }
-      await batch.commit();
+      final ops = unread.docs
+          .map((doc) => (WriteBatch b) => b.update(doc.reference, {'isRead': true}))
+          .toList();
+      await _commitInChunks(ops);
     } catch (e) {
       print('[FirestoreService] markAllAsRead error: $e');
     }
@@ -815,9 +832,7 @@ class FirestoreService {
         return (success: false, message: 'No seats available.');
       }
 
-      // Create request and deduct seats atomically
-      final batch = _db.batch();
-
+      // Create pending request only — seats deducted when host accepts
       final request = GroupRideRequest(
         groupRideId: groupRideId,
         passengerId: _uid!,
@@ -825,18 +840,7 @@ class FirestoreService {
         seatsRequested: seatsRequested,
         status: 'pending',
       );
-      final reqRef = _db.collection('group_ride_requests').doc();
-      batch.set(reqRef, request.toMap());
-
-      final newSeats = seatsAvailable - seatsRequested;
-      final updates = <String, dynamic>{
-        'seatsAvailable': newSeats,
-        'passengers': FieldValue.arrayUnion([_uid]),
-      };
-      if (newSeats <= 0) updates['status'] = 'full';
-      batch.update(_db.collection('group_rides').doc(groupRideId), updates);
-
-      await batch.commit();
+      await _db.collection('group_ride_requests').add(request.toMap());
 
       // Notify the host
       final hostId = rideData['hostId'] as String?;
@@ -957,10 +961,10 @@ class FirestoreService {
       if (expired.docs.isEmpty) return;
 
       for (final doc in expired.docs) {
-        final batch = _db.batch();
+        final ops = <void Function(WriteBatch)>[];
 
         // Update status to expired
-        batch.update(doc.reference, {'status': 'expired'});
+        ops.add((b) => b.update(doc.reference, {'status': 'expired'}));
 
         // Cancel all pending requests
         final requests = await _db
@@ -970,11 +974,11 @@ class FirestoreService {
         for (final req in requests.docs) {
           final status = req.data()['status'] as String?;
           if (status == 'pending' || status == 'accepted') {
-            batch.update(req.reference, {'status': 'expired'});
+            ops.add((b) => b.update(req.reference, {'status': 'expired'}));
           }
         }
 
-        await batch.commit();
+        await _commitInChunks(ops);
       }
     } catch (e) {
       print('[FirestoreService] cleanupExpiredGroupRides error: $e');
@@ -1098,8 +1102,26 @@ class FirestoreService {
       final passengerId = data['passengerId'] as String;
       final passengerName = data['passengerName'] as String? ?? 'Unknown';
       final groupRideId = data['groupRideId'] as String;
+      final seatsRequested = data['seatsRequested'] as int? ?? 1;
 
-      await _db.collection('group_ride_requests').doc(requestId).update({'status': 'accepted'});
+      // Deduct seats via transaction to prevent overbooking
+      await _db.runTransaction((txn) async {
+        final freshRide = await txn.get(_db.collection('group_rides').doc(groupRideId));
+        if (!freshRide.exists) throw Exception('Group ride not found.');
+        final freshData = freshRide.data()!;
+        final freshSeats = freshData['seatsAvailable'] as int? ?? 0;
+        if (freshSeats < seatsRequested) throw Exception('Not enough seats available.');
+
+        txn.update(_db.collection('group_ride_requests').doc(requestId), {'status': 'accepted'});
+
+        final newSeats = freshSeats - seatsRequested;
+        final updates = <String, dynamic>{
+          'seatsAvailable': newSeats,
+          'passengers': FieldValue.arrayUnion([passengerId]),
+        };
+        if (newSeats <= 0) updates['status'] = 'full';
+        txn.update(freshRide.reference, updates);
+      });
 
       // Notify passenger
       final rideDoc = await _db.collection('group_rides').doc(groupRideId).get();
@@ -1398,13 +1420,13 @@ class FirestoreService {
           .where('status', isEqualTo: 'sent')
           .get();
 
-      final batch = _db.batch();
+      final ops = <void Function(WriteBatch)>[];
       for (final doc in msgs.docs) {
         if (doc.data()['senderId'] != _uid) {
-          batch.update(doc.reference, {'status': 'delivered'});
+          ops.add((b) => b.update(doc.reference, {'status': 'delivered'}));
         }
       }
-      await batch.commit();
+      if (ops.isNotEmpty) await _commitInChunks(ops);
     } catch (e) {
       print('[FirestoreService] markMessagesDelivered error: $e');
     }
@@ -1426,19 +1448,19 @@ class FirestoreService {
           .limit(100)
           .get();
 
-      final batch = _db.batch();
+      final ops = <void Function(WriteBatch)>[];
       for (final doc in [...sent.docs, ...delivered.docs]) {
         if (doc.data()['senderId'] != _uid) {
-          batch.update(doc.reference, {'status': 'seen'});
+          ops.add((b) => b.update(doc.reference, {'status': 'seen'}));
         }
       }
 
       // Always update lastReadBy for the current user
-      batch.update(_db.collection('chat_rooms').doc(roomId), {
+      ops.add((b) => b.update(_db.collection('chat_rooms').doc(roomId), {
         'lastReadBy.$_uid': Timestamp.now(),
-      });
+      }));
 
-      await batch.commit();
+      await _commitInChunks(ops);
     } catch (e) {
       print('[FirestoreService] markMessagesSeen error: $e');
     }
@@ -1511,15 +1533,66 @@ class FirestoreService {
 
       for (final doc in expired.docs) {
         final messages = await doc.reference.collection('messages').limit(200).get();
-        final batch = _db.batch();
+        final ops = <void Function(WriteBatch)>[];
         for (final msg in messages.docs) {
-          batch.delete(msg.reference);
+          ops.add((b) => b.delete(msg.reference));
         }
-        batch.delete(doc.reference);
-        await batch.commit();
+        ops.add((b) => b.delete(doc.reference));
+        await _commitInChunks(ops);
       }
     } catch (e) {
       print('[FirestoreService] cleanupExpiredChats error: $e');
+    }
+  }
+
+  /// Cleanup old notifications (> 7 days) to prevent database bloat
+  static Future<void> cleanupOldNotifications() async {
+    if (_uid == null) return;
+    try {
+      final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7)));
+      final old = await _db
+          .collection('notifications')
+          .where('userId', isEqualTo: _uid)
+          .where('createdAt', isLessThan: cutoff)
+          .limit(200)
+          .get();
+      if (old.docs.isEmpty) return;
+      final ops = old.docs
+          .map((doc) => (WriteBatch b) => b.delete(doc.reference))
+          .toList();
+      await _commitInChunks(ops);
+    } catch (e) {
+      print('[FirestoreService] cleanupOldNotifications error: $e');
+    }
+  }
+
+  /// Cleanup old completed/cancelled rides (> 7 days) and their requests
+  static Future<void> cleanupOldRides() async {
+    try {
+      final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7)));
+      final old = await _db
+          .collection('rides')
+          .where('createdAt', isLessThan: cutoff)
+          .where('status', whereIn: ['completed', 'cancelled'])
+          .limit(50)
+          .get();
+      if (old.docs.isEmpty) return;
+
+      for (final doc in old.docs) {
+        final ops = <void Function(WriteBatch)>[];
+        // Delete associated requests
+        final requests = await _db
+            .collection('ride_requests')
+            .where('rideId', isEqualTo: doc.id)
+            .get();
+        for (final req in requests.docs) {
+          ops.add((b) => b.delete(req.reference));
+        }
+        ops.add((b) => b.delete(doc.reference));
+        await _commitInChunks(ops);
+      }
+    } catch (e) {
+      print('[FirestoreService] cleanupOldRides error: $e');
     }
   }
 }

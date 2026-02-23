@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../widgets/premium_pickers.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/ride_model.dart';
 import '../services/auth_service.dart';
@@ -720,12 +721,12 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
   String _getVehicleName(VehicleType t) => t == VehicleType.car ? "Car" : (t == VehicleType.bike ? "Bike" : "CNG");
 
   Future<void> _pickDate() async {
-    final d = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 30)));
+    final d = await PremiumPickers.pickDate(context, initialDate: _selectedDate);
     if (d != null) setState(() => _selectedDate = d);
   }
 
   Future<void> _pickTime() async {
-    final t = await showTimePicker(context: context, initialTime: _selectedTime);
+    final t = await PremiumPickers.pickTime(context, initialTime: _selectedTime);
     if (t != null) setState(() => _selectedTime = t);
   }
 

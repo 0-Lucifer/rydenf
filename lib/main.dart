@@ -1,15 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'services/auth_gate.dart';
 import 'services/local_notification_service.dart';
+import 'services/firestore_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Cap Firestore offline cache at 100 MB
+  FirebaseFirestore.instance.settings = const Settings(
+    cacheSizeBytes: 104857600, // 100 MB
+    persistenceEnabled: true,
+  );
+
   await LocalNotificationService.instance.init();
+
+  // Fire-and-forget stale data cleanup (runs in background)
+  FirestoreService.cleanupOldNotifications();
+  FirestoreService.cleanupOldRides();
+  FirestoreService.cleanupExpiredGroupRides();
+  FirestoreService.cleanupExpiredChats();
+
   runApp(const RydenApp());
 }
 

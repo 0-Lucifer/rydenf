@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../widgets/premium_pickers.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/group_ride_model.dart';
 import '../services/firestore_service.dart';
@@ -43,11 +44,9 @@ class _GroupRidesScreenState extends State<GroupRidesScreen> {
   }
 
   Future<void> _pickDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
+    final DateTime? picked = await PremiumPickers.pickDate(
+      context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
     );
     if (picked != null) setState(() => _selectedDate = picked);
   }

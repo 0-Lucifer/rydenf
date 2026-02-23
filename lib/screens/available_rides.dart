@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../widgets/premium_pickers.dart';
 import '../models/ride_model.dart';
 import '../widgets/ride_card.dart';
 import '../services/firestore_service.dart';
@@ -151,11 +152,9 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
               Expanded(
                 child: GestureDetector(
                   onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
+                    final date = await PremiumPickers.pickDate(
+                      context,
                       initialDate: _selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 30)),
                     );
                     if (date != null) setState(() => _selectedDate = date);
                   },
