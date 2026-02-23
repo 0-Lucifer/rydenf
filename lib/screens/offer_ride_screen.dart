@@ -167,6 +167,36 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
       ),
       child: Scaffold(
         backgroundColor: kBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Center(
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(Icons.arrow_back_ios_new_rounded, color: kTextPrimary, size: 18),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          centerTitle: true,
+          title: Text(
+            "Offer a Ride",
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18, color: kTextPrimary),
+          ),
+        ),
         body: SafeArea(
           child: Column(
             children: [

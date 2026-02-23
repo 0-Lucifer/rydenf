@@ -5,6 +5,8 @@ import '../models/ride_model.dart';
 import '../models/ride_request_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../widgets/profile_popup.dart';
+import 'chat_screen.dart';
 import 'ongoing_ride_screen.dart';
 
 class RideDetailScreen extends StatefulWidget {
@@ -299,38 +301,98 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   // ───────────────────────────────────────────────────────
 
   Widget _buildHostSection(Ride ride) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 26,
-          backgroundColor: kPrimary.withOpacity(0.05),
-          child: Text(ride.driverName[0].toUpperCase(), style: const TextStyle(color: kPrimary, fontWeight: FontWeight.bold)),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final isDriver = ride.driverId == _currentUid;
+    final hasRating = ride.rating != null && ride.rating!.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: kTextMain.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 8))],
+      ),
+      child: Column(
+        children: [
+          Row(
             children: [
-              Text(ride.driverName, style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: kTextMain)),
-              Row(
-                children: [
-                  const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
-                  const SizedBox(width: 4),
-                  Text("5.0", style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: kTextMain)),
-                  const SizedBox(width: 8),
-                  Text("Verified Host", style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: kSuccess)),
-                ],
+              GestureDetector(
+                onTap: () => showUserProfile(context, ride.driverId),
+                child: CircleAvatar(
+                  radius: 26,
+                  backgroundColor: kPrimary.withOpacity(0.05),
+                  child: Text(ride.driverName[0].toUpperCase(), style: const TextStyle(color: kPrimary, fontWeight: FontWeight.bold)),
+                ),
               ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => showUserProfile(context, ride.driverId),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(ride.driverName, style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: kTextMain)),
+                          const SizedBox(width: 6),
+                          Icon(Icons.open_in_new_rounded, size: 12, color: kAccent.withOpacity(0.5)),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Icon(Icons.star_rounded, size: 14, color: hasRating ? Colors.amber : Colors.grey),
+                          const SizedBox(width: 4),
+                          Text(hasRating ? ride.rating! : "No rating", style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: kTextMain)),
+                          const SizedBox(width: 8),
+                          Text("Verified Host", style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: kSuccess)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (!isDriver)
+                GestureDetector(
+                  onTap: () => _handleChatWithDriver(ride),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: kAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.chat_bubble_rounded, color: kAccent, size: 20),
+                  ),
+                ),
             ],
           ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: kAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-          child: const Icon(Icons.chat_bubble_rounded, color: kAccent, size: 20),
-        ),
-      ],
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () => showUserProfile(context, ride.driverId),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: kAccent.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.person_rounded, size: 16, color: kAccent),
+                  const SizedBox(width: 6),
+                  Text("View Profile", style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: kAccent)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  void _handleChatWithDriver(Ride ride) async {
+    final room = await FirestoreService.createOrGetPersonalChat(ride.driverId);
+    if (room != null && mounted) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: room)));
+    } else if (mounted) {
+      _showSnack("Could not start chat.", false);
+    }
   }
 
   // ───────────────────────────────────────────────────────
@@ -369,9 +431,23 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
       decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: kTextSub.withOpacity(0.05))),
       child: Row(
         children: [
-          CircleAvatar(radius: 16, backgroundColor: kAccent.withOpacity(0.1), child: Text(req.passengerName[0], style: const TextStyle(fontSize: 12, color: kAccent))),
+          GestureDetector(
+            onTap: () => showUserProfile(context, req.passengerId),
+            child: CircleAvatar(radius: 16, backgroundColor: kAccent.withOpacity(0.1), child: Text(req.passengerName[0], style: const TextStyle(fontSize: 12, color: kAccent))),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: Text(req.passengerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => showUserProfile(context, req.passengerId),
+              child: Row(
+                children: [
+                  Text(req.passengerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.open_in_new_rounded, size: 10, color: kAccent.withOpacity(0.4)),
+                ],
+              ),
+            ),
+          ),
           if (req.status == 'pending') ...[
             _actionBtn(Icons.close, kError, () => _handleReject(req.id!)),
             const SizedBox(width: 8),

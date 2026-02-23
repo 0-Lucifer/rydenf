@@ -1,6 +1,12 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/group_ride_model.dart';
+import '../services/firestore_service.dart';
+import '../widgets/profile_popup.dart';
+import 'group_ride_requests_screen.dart';
+import 'chat_screen.dart';
 
 // --- Redesigned UI Constants ---
 class RydenTokens {
@@ -12,18 +18,8 @@ class RydenTokens {
   static const EdgeInsets screenPadding = EdgeInsets.symmetric(horizontal: 24);
 }
 
-// Keep original theme constants for compatibility if needed elsewhere, 
-// but redesign uses RydenTokens and Material 3 Theme.
-const Color kPrimaryBlue = Color(0xFF2E7CF6);
-const Color kContentColor = Color(0xFF0F172A);
-const Color kSecondaryText = Color(0xFF64748B);
-const Color kBgColor = Color(0xFFF8FAFC);
-const Color kSuccessGreen = Color(0xFF10B981);
-const Color kErrorRed = Color(0xFFEF4444);
-const Color kBorderColor = Color(0xFFE2E8F0);
-
-/// Redesigned Entry Point
-void showGroupRideDetails(BuildContext context, Map<String, dynamic> ride) {
+/// Redesigned Entry Point — now accepts GroupRide model
+void showGroupRideDetails(BuildContext context, GroupRide ride) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -34,7 +30,7 @@ void showGroupRideDetails(BuildContext context, Map<String, dynamic> ride) {
 }
 
 class GroupRideDetailsSheet extends StatefulWidget {
-  final Map<String, dynamic> ride;
+  final GroupRide ride;
   const GroupRideDetailsSheet({super.key, required this.ride});
 
   @override
@@ -43,21 +39,95 @@ class GroupRideDetailsSheet extends StatefulWidget {
 
 class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
   bool _isRequesting = false;
+  String _requestStatus = 'none'; // 'none', 'pending', 'accepted', 'rejected'
+  bool _isLoadingStatus = true;
 
-  void _handleJoinRequest() async {
-    if (widget.ride['isFull'] == true || widget.ride['seatsLeft'] == 0) return;
-    setState(() => _isRequesting = true);
-    await Future.delayed(const Duration(milliseconds: 1800));
-    if (mounted) {
-      setState(() => _isRequesting = false);
-      Navigator.pop(context);
-      _showPremiumSnackBar(context, "Request sent to ${widget.ride['host']}!", RydenTokens.success);
+  bool get _isHost =>
+      FirebaseAuth.instance.currentUser?.uid == widget.ride.hostId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_isHost) {
+      _loadRequestStatus();
+    } else {
+      _isLoadingStatus = false;
     }
   }
 
-  void _handleChat() {
+  void _loadRequestStatus() async {
+    if (widget.ride.id == null) { setState(() => _isLoadingStatus = false); return; }
+    final status = await FirestoreService.getUserRequestStatusForRide(widget.ride.id!);
+    if (mounted) setState(() { _requestStatus = status; _isLoadingStatus = false; });
+  }
+
+  void _handleJoinRequest() async {
+    if (widget.ride.isFull || _isHost) return;
+    if (widget.ride.id == null) return;
+
+    setState(() => _isRequesting = true);
+
+    final result = await FirestoreService.requestGroupRide(
+      groupRideId: widget.ride.id!,
+    );
+
+    if (mounted) {
+      setState(() {
+        _isRequesting = false;
+        if (result.success) _requestStatus = 'pending';
+      });
+      _showPremiumSnackBar(
+        context,
+        result.message,
+        result.success ? RydenTokens.success : RydenTokens.danger,
+      );
+    }
+  }
+
+  void _handleEnterGC() async {
+    if (widget.ride.id == null) return;
+    setState(() => _isRequesting = true);
+    final room = await FirestoreService.createOrGetGroupChat(widget.ride.id!);
+    if (room != null && mounted) {
+      Navigator.pop(context);
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(room: room)));
+    } else if (mounted) {
+      setState(() => _isRequesting = false);
+      _showPremiumSnackBar(context, "Could not open group chat.", RydenTokens.danger);
+    }
+  }
+
+  void _handleChat() async {
+    if (_isHost) {
+      // Host → open group chat or requests
+      Navigator.pop(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => GroupRideRequestsScreen(ride: widget.ride)),
+      );
+    } else {
+      // Other user → create personal chat with host
+      final room = await FirestoreService.createOrGetPersonalChat(widget.ride.hostId);
+      if (room != null && mounted) {
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ChatScreen(room: room)),
+        );
+      } else if (mounted) {
+        Navigator.pop(context);
+        _showPremiumSnackBar(
+            context, "Could not start chat.", RydenTokens.danger);
+      }
+    }
+  }
+
+  void _handleManageRequests() {
     Navigator.pop(context);
-    _showPremiumSnackBar(context, "Chatting with host ${widget.ride['host']}...", RydenTokens.primary);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => GroupRideRequestsScreen(ride: widget.ride)),
+    );
   }
 
   void _showPremiumSnackBar(BuildContext context, String msg, Color color) {
@@ -72,14 +142,25 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
     );
   }
 
+  String _formatDepartureTime(DateTime dep) {
+    final now = DateTime.now();
+    if (dep.year == now.year && dep.month == now.month && dep.day == now.day) {
+      return "Today, ${DateFormat('h:mm a').format(dep)}";
+    } else if (dep.year == now.year && dep.month == now.month && dep.day == now.day + 1) {
+      return "Tomorrow, ${DateFormat('h:mm a').format(dep)}";
+    } else {
+      return DateFormat('MMM dd, h:mm a').format(dep);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isFull = widget.ride['isFull'] ?? (widget.ride['seatsLeft'] == 0);
+    final isFull = widget.ride.isFull;
 
     return Center(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600), // Responsive Constraint for Tablet/Desktop
+        constraints: const BoxConstraints(maxWidth: 600),
         child: DraggableScrollableSheet(
           initialChildSize: 0.9,
           minChildSize: 0.5,
@@ -145,59 +226,37 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
 
   Widget _buildHeader(bool isFull, bool isDark) {
     final statusColor = isFull ? RydenTokens.danger : RydenTokens.success;
-    final seatsLeft = widget.ride['seatsLeft'] ?? 0;
+    final seatsLeft = widget.ride.seatsAvailable;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // --- Redesigned Top-Notch Status Badge ---
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: statusColor.withOpacity(0.08),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: statusColor.withOpacity(0.15),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: statusColor.withOpacity(0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            border: Border.all(color: statusColor.withOpacity(0.15)),
+            boxShadow: [BoxShadow(color: statusColor.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 4))],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Indicator dot with glow
               Container(
-                width: 8,
-                height: 8,
+                width: 8, height: 8,
                 decoration: BoxDecoration(
-                  color: statusColor,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: statusColor.withOpacity(0.4),
-                      blurRadius: 6,
-                      spreadRadius: 2,
-                    ),
-                  ],
+                  color: statusColor, shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: statusColor.withOpacity(0.4), blurRadius: 6, spreadRadius: 2)],
                 ),
               ),
               const SizedBox(width: 10),
               Text(
-                isFull 
-                  ? "RIDE FULL" 
-                  : "$seatsLeft ${seatsLeft == 1 ? 'SEAT' : 'SEATS'} REMAINING",
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: statusColor,
-                  letterSpacing: 1.2,
-                ),
+                _isHost
+                    ? "YOUR RIDE"
+                    : (isFull
+                        ? "RIDE FULL"
+                        : "$seatsLeft ${seatsLeft == 1 ? 'SEAT' : 'SEATS'} REMAINING"),
+                style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w900, color: statusColor, letterSpacing: 1.2),
               ),
             ],
           ),
@@ -215,6 +274,8 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
   }
 
   Widget _buildStatsGrid(bool isDark) {
+    final timeText = _formatDepartureTime(widget.ride.departureTime);
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -226,11 +287,11 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Expanded(child: _StatItem(Icons.schedule_rounded, "Time", widget.ride['time'], isDark)),
+            Expanded(child: _StatItem(Icons.schedule_rounded, "Time", timeText, isDark)),
             _buildVerticalDivider(isDark),
-            Expanded(child: _StatItem(Icons.commute_rounded, "Mode", widget.ride['transport'], isDark)),
+            Expanded(child: _StatItem(Icons.commute_rounded, "Mode", widget.ride.transport, isDark)),
             _buildVerticalDivider(isDark),
-            Expanded(child: _StatItem(Icons.face_retouching_natural_rounded, "Gender", widget.ride['gender'], isDark)),
+            Expanded(child: _StatItem(Icons.face_retouching_natural_rounded, "Gender", widget.ride.gender, isDark)),
           ],
         ),
       ),
@@ -254,20 +315,17 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _RouteNode(Icons.radio_button_checked_rounded, RydenTokens.primary, "Pickup Point", widget.ride['from'], isDark),
+              _RouteNode(Icons.radio_button_checked_rounded, RydenTokens.primary, "Pickup Point", widget.ride.from, isDark),
               Container(
-                margin: const EdgeInsets.only(left: 11),
-                height: 30,
-                width: 2,
+                margin: const EdgeInsets.only(left: 11), height: 30, width: 2,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
                     colors: [RydenTokens.primary, RydenTokens.danger.withOpacity(0.5)],
                   ),
                 ),
               ),
-              _RouteNode(Icons.location_on_rounded, RydenTokens.danger, "Drop-off Point", widget.ride['to'], isDark),
+              _RouteNode(Icons.location_on_rounded, RydenTokens.danger, "Drop-off Point", widget.ride.to, isDark),
             ],
           ),
         ),
@@ -281,9 +339,9 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _SectionTitle("Host", isDark),
+            _SectionTitle(_isHost ? "You (Host)" : "Host", isDark),
             TextButton(
-              onPressed: () {},
+              onPressed: () => showUserProfile(context, widget.ride.hostId),
               child: Text("View Profile", style: GoogleFonts.plusJakartaSans(color: RydenTokens.primary, fontWeight: FontWeight.bold)),
             ),
           ],
@@ -299,24 +357,33 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: RydenTokens.primary,
-                child: Text(widget.ride['host'][0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+                child: Text(
+                  widget.ride.hostName.isNotEmpty ? widget.ride.hostName[0] : '?',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.ride['host'], style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
+                    Text(
+                      widget.ride.hostName.isNotEmpty ? widget.ride.hostName : 'Unknown',
+                      style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black),
+                    ),
                     Row(
                       children: [
-                        const Icon(Icons.star_rounded, size: 16, color: Colors.amber),
-                        Text(" ${widget.ride['rating']} • Trusted Host", style: GoogleFonts.plusJakartaSans(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54, fontWeight: FontWeight.w600)),
+                        Icon(Icons.star_rounded, size: 16, color: widget.ride.hostRating > 0 ? Colors.amber : Colors.grey),
+                        Text(
+                          " ${widget.ride.hostRating > 0 ? widget.ride.hostRating.toStringAsFixed(1) : 'No rating'} • ${_isHost ? 'You' : 'Trusted Host'}",
+                          style: GoogleFonts.plusJakartaSans(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54, fontWeight: FontWeight.w600),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              if (widget.ride['isVerified'] ?? false)
+              if (widget.ride.isVerified)
                 const Icon(Icons.verified_rounded, color: RydenTokens.primary, size: 24),
             ],
           ),
@@ -346,7 +413,7 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
         border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!),
       ),
       child: Text(
-        widget.ride['notes'] ?? "Host has not added extra notes for this trip.",
+        widget.ride.notes.isNotEmpty ? widget.ride.notes : "Host has not added extra notes for this trip.",
         style: GoogleFonts.plusJakartaSans(height: 1.6, color: isDark ? Colors.white70 : Colors.black87),
       ),
     );
@@ -375,11 +442,45 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
   Widget _buildFooterActions(bool isDark) {
     return Center(
       child: TextButton.icon(
-        onPressed: () {},
+        onPressed: () => _showReportDialog(isDark),
         icon: const Icon(Icons.flag_outlined, size: 16),
         label: const Text("Report this ride"),
         style: TextButton.styleFrom(foregroundColor: Colors.grey, textStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
       ),
+    );
+  }
+
+  void _showReportDialog(bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 20),
+              Text("Report this ride", style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
+              const SizedBox(height: 4),
+              Text("Select a reason below", style: GoogleFonts.plusJakartaSans(fontSize: 13, color: Colors.grey)),
+              const SizedBox(height: 20),
+              for (final reason in ["Inappropriate behavior", "Safety concern", "Misleading ride details", "Spam or scam", "Other"])
+                ListTile(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showPremiumSnackBar(context, "Report submitted. Thank you!", const Color(0xFF10B981));
+                  },
+                  leading: const Icon(Icons.report_outlined, size: 20, color: Colors.redAccent),
+                  title: Text(reason, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -389,39 +490,68 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : Colors.white,
         border: Border(top: BorderSide(color: isDark ? Colors.white10 : Colors.grey[200]!)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          )
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: _CustomButton(
-              onTap: _handleChat,
-              icon: Icons.chat_bubble_outline_rounded,
-              label: "Chat with Host",
-              isPrimary: false,
-              isDark: isDark,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 1,
-            child: _CustomButton(
-              onTap: isFull ? null : _handleJoinRequest,
-              label: isFull ? "Ride Full" : "Request to Join",
-              isPrimary: true,
-              isLoading: _isRequesting,
-              isDark: isDark,
-            ),
-          ),
-        ],
-      ),
+      child: _isHost
+          ? Row(
+              children: [
+                Expanded(
+                  child: _CustomButton(
+                    onTap: _handleManageRequests,
+                    icon: Icons.people_alt_rounded,
+                    label: "Manage Requests",
+                    isPrimary: true,
+                    isDark: isDark,
+                  ),
+                ),
+              ],
+            )
+          : _isLoadingStatus
+              ? const Center(child: SizedBox(height: 56, child: CircularProgressIndicator(color: RydenTokens.primary)))
+              : Row(
+                  children: [
+                    if (_requestStatus != 'accepted') ...[
+                      Expanded(
+                        flex: 1,
+                        child: _CustomButton(
+                          onTap: _handleChat,
+                          icon: Icons.chat_bubble_outline_rounded,
+                          label: "Chat with Host",
+                          isPrimary: false,
+                          isDark: isDark,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      flex: 1,
+                      child: _requestStatus == 'accepted'
+                          ? _CustomButton(
+                              onTap: _handleEnterGC,
+                              icon: Icons.forum_rounded,
+                              label: "Enter GC 💬",
+                              isPrimary: true,
+                              isLoading: _isRequesting,
+                              isDark: isDark,
+                            )
+                          : _requestStatus == 'pending'
+                              ? _CustomButton(
+                                  onTap: null,
+                                  icon: Icons.hourglass_top_rounded,
+                                  label: "Requested ⏳",
+                                  isPrimary: false,
+                                  isDark: isDark,
+                                )
+                              : _CustomButton(
+                                  onTap: isFull ? null : _handleJoinRequest,
+                                  label: isFull ? "Ride Full" : "Request to Join",
+                                  isPrimary: true,
+                                  isLoading: _isRequesting,
+                                  isDark: isDark,
+                                ),
+                    ),
+                  ],
+                ),
     );
   }
 }
@@ -440,7 +570,7 @@ class _StatItem extends StatelessWidget {
   final IconData icon;
   final String label, value;
   final bool isDark;
-  
+
   const _StatItem(this.icon, this.label, this.value, this.isDark);
   @override
   Widget build(BuildContext context) {
@@ -514,7 +644,7 @@ class _CustomButton extends StatelessWidget {
                     if (icon != null) ...[Icon(icon, color: fgColor, size: 20), const SizedBox(width: 8)],
                     Flexible(
                       child: Text(
-                        label, 
+                        label,
                         style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w800, color: fgColor),
                         overflow: TextOverflow.ellipsis,
                       ),

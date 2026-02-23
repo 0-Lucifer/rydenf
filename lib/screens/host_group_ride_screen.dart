@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/group_ride_model.dart';
+import '../services/firestore_service.dart';
 
 class HostGroupRideScreen extends StatefulWidget {
   const HostGroupRideScreen({super.key});
@@ -35,6 +38,13 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
 
   void _nextStep() {
     if (_currentStep < 2) {
+      // Validate route step
+      if (_currentStep == 0) {
+        if (_fromController.text.trim().isEmpty || _toController.text.trim().isEmpty) {
+          _showSnackBar('Please enter both pickup and destination locations.', Colors.redAccent);
+          return;
+        }
+      }
       _pageController.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeOutQuart,
@@ -56,6 +66,43 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
   }
 
   void _handlePublish() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showSnackBar('You must be logged in to host a ride.', Colors.redAccent);
+      return;
+    }
+
+    // Build departure DateTime from selected date + time
+    final departureTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _selectedTime.hour,
+      _selectedTime.minute,
+    );
+
+    // Get user profile for host name
+    final profile = await FirestoreService.getUserProfile(user.uid);
+    final hostName = profile?.displayName.isNotEmpty == true
+        ? profile!.displayName
+        : user.email?.split('@').first ?? 'Unknown';
+
+    final groupRide = GroupRide(
+      hostId: user.uid,
+      hostName: hostName,
+      hostRating: 5.0,
+      isVerified: profile?.studentId.isNotEmpty == true,
+      from: _fromController.text.trim(),
+      to: _toController.text.trim(),
+      departureTime: departureTime,
+      transport: _selectedTransport,
+      gender: _selectedGender,
+      seatsTotal: _seatsAvailable,
+      seatsAvailable: _seatsAvailable,
+      notes: _notesController.text.trim(),
+    );
+
+    // Show loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -71,16 +118,24 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
       ),
     );
 
-    await Future.delayed(const Duration(seconds: 2));
+    final result = await FirestoreService.publishGroupRide(groupRide);
+
     if (!mounted) return;
-
     Navigator.pop(context); // Pop loading
-    Navigator.pop(context); // Go back
 
+    if (result.success) {
+      Navigator.pop(context); // Go back to group rides screen
+      _showSnackBar(result.message, const Color(0xFF10B981));
+    } else {
+      _showSnackBar(result.message, Colors.redAccent);
+    }
+  }
+
+  void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("Ride hosted successfully!", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
-        backgroundColor: const Color(0xFF10B981),
+        content: Text(message, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+        backgroundColor: color,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

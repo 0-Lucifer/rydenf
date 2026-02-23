@@ -108,10 +108,10 @@ class RideCard extends StatelessWidget {
                         ),
                         Row(
                           children: [
-                            const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
+                            Icon(Icons.star_rounded, color: ride.rating != null ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8), size: 14),
                             const SizedBox(width: 2),
                             Text(
-                              ride.rating ?? "5.0",
+                              ride.rating ?? "No rating",
                               style: GoogleFonts.plusJakartaSans(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 12,
