@@ -402,7 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildSafetySection() {
-    const color = Color(0xFFB91C1C); // Strong Emergency Red
+    const color = Color(0xFFFF3131); // Strong Emergency Red
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: _cardStyle(color, borderColor: color),
@@ -410,7 +410,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(24),
-          onTap: () {},
+          onTap: () => _showSafetyDialog(),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             leading: Container(
@@ -474,6 +474,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showSafetyDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 20),
+              Text("Safety & SOS", style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: kTextPrimary)),
+              const SizedBox(height: 4),
+              Text("Your safety is our priority", style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTextSecondary)),
+              const SizedBox(height: 24),
+              _safetyTile(Icons.phone_in_talk_rounded, "Emergency Call (999)", "Call national emergency services", Colors.red, () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("To call 999, use your phone dialer.", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+                    backgroundColor: Colors.redAccent,
+                    behavior: SnackBarBehavior.floating,
+                    margin: const EdgeInsets.all(20),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+              _safetyTile(Icons.share_location_rounded, "Share Live Location", "Share your trip with trusted contacts", kPrimaryBlue, () {
+                Navigator.pop(ctx);
+              }),
+              const SizedBox(height: 8),
+              _safetyTile(Icons.shield_rounded, "Safety Tips", "Always verify driver identity before boarding", const Color(0xFF10B981), () {
+                Navigator.pop(ctx);
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _safetyTile(IconData icon, String title, String subtitle, Color color, VoidCallback onTap) {
+    return ListTile(
+      onTap: onTap,
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, color: color, size: 20),
+      ),
+      title: Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14, color: kTextPrimary)),
+      subtitle: Text(subtitle, style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextSecondary)),
+      trailing: Icon(Icons.chevron_right_rounded, color: color.withOpacity(0.5)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     );
   }
 
