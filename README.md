@@ -1,4 +1,4 @@
-<![CDATA[<div align="center">
+<div align="center">
 
 # 🚗 RYDEN
 
@@ -9,7 +9,7 @@
 [![Dart](https://img.shields.io/badge/Dart-3.0+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![License](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
 
-**Ryden** connects riders and drivers in a clean, real-time platform — built for students who share daily commutes.  
+**Ryden** connects riders and drivers in a clean, real-time platform — built for students who share daily commutes.
 Offer a ride, find one, or host a group ride in seconds.
 
 ---
@@ -195,7 +195,7 @@ service cloud.firestore {
 
 ---
 
-## 🤝 Contributing
+<!-- ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
 
@@ -203,9 +203,7 @@ Contributions are welcome! Please follow these steps:
 2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
 3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
 4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
----
+5. **Open** a Pull Request -->
 
 ## 📄 License
 
@@ -220,4 +218,3 @@ Distributed under the **MIT License**. See `LICENSE` for details.
 _Ryden — Because every ride is better when shared._
 
 </div>
-]]>
