@@ -678,8 +678,10 @@ class _PremiumRideCard extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      Text(ride.hostName.isNotEmpty ? ride.hostName : 'Unknown',
-                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16, color: kContentColor)),
+                      Flexible(
+                        child: Text(ride.hostName.isNotEmpty ? ride.hostName : 'Unknown',
+                            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16, color: kContentColor)),
+                      ),
                       if (ride.isVerified)
                         const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.verified_rounded, size: 16, color: kPrimaryBlue)),
                     ]),
@@ -691,7 +693,9 @@ class _PremiumRideCard extends StatelessWidget {
                       const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Icon(Icons.circle, size: 4, color: kSecondaryText)),
                       Icon(genderIcon, size: 14, color: kSecondaryText),
                       const SizedBox(width: 4),
-                      Text(ride.gender, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13, color: kSecondaryText)),
+                      Flexible(
+                        child: Text(ride.gender, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13, color: kSecondaryText)),
+                      ),
                     ]),
                   ]),
                 ),

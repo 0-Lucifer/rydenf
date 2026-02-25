@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/group_ride_model.dart';
 import '../services/firestore_service.dart';
 import '../widgets/profile_popup.dart';
+import '../widgets/rating_dialog.dart';
 import 'group_ride_requests_screen.dart';
 import 'chat_screen.dart';
 
@@ -127,6 +128,72 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => GroupRideRequestsScreen(ride: widget.ride)),
+    );
+  }
+
+  void _handleStartRide() async {
+    if (widget.ride.id == null) return;
+    setState(() => _isRequesting = true);
+    final result = await FirestoreService.startGroupRide(widget.ride.id!);
+    if (mounted) {
+      setState(() => _isRequesting = false);
+      if (result.success) {
+        Navigator.pop(context);
+      }
+      _showPremiumSnackBar(context, result.message, result.success ? RydenTokens.success : RydenTokens.danger);
+    }
+  }
+
+  void _handleEndRide() async {
+    if (widget.ride.id == null) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text('End Group Ride?', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
+        content: Text(
+          'This will end the ride and dissolve the group. You can rate passengers first.',
+          style: GoogleFonts.plusJakartaSans(fontSize: 14, color: Colors.grey[600]),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+
+              // Show rating dialogs for passengers before dissolution
+              if (widget.ride.passengers.isNotEmpty && mounted) {
+                final profiles = await FirestoreService.getProfiles(widget.ride.passengers);
+                if (mounted && profiles.isNotEmpty) {
+                  await showSequentialRatingDialogs(
+                    context,
+                    users: profiles,
+                    rideId: widget.ride.id!,
+                    rideType: 'group_ride',
+                  );
+                }
+              }
+
+              // Dissolve after rating
+              setState(() => _isRequesting = true);
+              final result = await FirestoreService.completeGroupRide(widget.ride.id!);
+              if (mounted) {
+                Navigator.pop(context);
+                _showPremiumSnackBar(context, result.message, result.success ? RydenTokens.success : RydenTokens.danger);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: RydenTokens.danger,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: Text('End Ride', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -253,9 +320,11 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
               Text(
                 _isHost
                     ? "YOUR RIDE"
-                    : (isFull
-                        ? "RIDE FULL"
-                        : "$seatsLeft ${seatsLeft == 1 ? 'SEAT' : 'SEATS'} REMAINING"),
+                    : widget.ride.status == 'in_progress'
+                        ? "RIDE IN PROGRESS"
+                        : (isFull
+                            ? "RIDE FULL"
+                            : "$seatsLeft ${seatsLeft == 1 ? 'SEAT' : 'SEATS'} REMAINING"),
                 style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w900, color: statusColor, letterSpacing: 1.2),
               ),
             ],
@@ -485,6 +554,9 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
   }
 
   Widget _buildStickyFooter(bool isFull, bool isDark) {
+    final status = widget.ride.status;
+    final hasPassengers = widget.ride.passengers.isNotEmpty;
+
     return Container(
       padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).padding.bottom + 16),
       decoration: BoxDecoration(
@@ -493,65 +565,153 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
       ),
       child: _isHost
-          ? Row(
-              children: [
-                Expanded(
-                  child: _CustomButton(
-                    onTap: _handleManageRequests,
-                    icon: Icons.people_alt_rounded,
-                    label: "Manage Requests",
-                    isPrimary: true,
-                    isDark: isDark,
-                  ),
-                ),
-              ],
-            )
+          ? _buildHostFooter(status, hasPassengers, isDark)
           : _isLoadingStatus
               ? const Center(child: SizedBox(height: 56, child: CircularProgressIndicator(color: RydenTokens.primary)))
-              : Row(
-                  children: [
-                    if (_requestStatus != 'accepted') ...[
-                      Expanded(
-                        flex: 1,
-                        child: _CustomButton(
-                          onTap: _handleChat,
-                          icon: Icons.chat_bubble_outline_rounded,
-                          label: "Chat with Host",
-                          isPrimary: false,
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                    Expanded(
-                      flex: 1,
-                      child: _requestStatus == 'accepted'
-                          ? _CustomButton(
-                              onTap: _handleEnterGC,
-                              icon: Icons.forum_rounded,
-                              label: "Enter GC 💬",
-                              isPrimary: true,
-                              isLoading: _isRequesting,
-                              isDark: isDark,
-                            )
-                          : _requestStatus == 'pending'
-                              ? _CustomButton(
-                                  onTap: null,
-                                  icon: Icons.hourglass_top_rounded,
-                                  label: "Requested ⏳",
-                                  isPrimary: false,
-                                  isDark: isDark,
-                                )
-                              : _CustomButton(
-                                  onTap: isFull ? null : _handleJoinRequest,
-                                  label: isFull ? "Ride Full" : "Request to Join",
-                                  isPrimary: true,
-                                  isLoading: _isRequesting,
-                                  isDark: isDark,
-                                ),
+              : _buildPassengerFooter(status, isFull, isDark),
+    );
+  }
+
+  Widget _buildHostFooter(String status, bool hasPassengers, bool isDark) {
+    if (status == 'in_progress') {
+      // In progress: End Ride | Enter GC
+      return Row(
+        children: [
+          Expanded(
+            child: _CustomButton(
+              onTap: _handleEndRide,
+              icon: Icons.stop_circle_rounded,
+              label: "End Ride",
+              isPrimary: false,
+              isDark: isDark,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _CustomButton(
+              onTap: _handleEnterGC,
+              icon: Icons.forum_rounded,
+              label: "Enter GC 💬",
+              isPrimary: true,
+              isLoading: _isRequesting,
+              isDark: isDark,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Active/Full: Requests | Start Ride (if passengers) | Enter GC
+    return Row(
+      children: [
+        Expanded(
+          child: _CustomButton(
+            onTap: _handleManageRequests,
+            icon: Icons.people_alt_rounded,
+            label: "Requests",
+            isPrimary: false,
+            isDark: isDark,
+          ),
+        ),
+        if (hasPassengers) ...[
+          const SizedBox(width: 8),
+          Expanded(
+            child: _CustomButton(
+              onTap: _handleStartRide,
+              icon: Icons.play_arrow_rounded,
+              label: "Start Ride",
+              isPrimary: true,
+              isLoading: _isRequesting,
+              isDark: isDark,
+            ),
+          ),
+        ],
+        const SizedBox(width: 8),
+        Expanded(
+          child: _CustomButton(
+            onTap: _handleEnterGC,
+            icon: Icons.forum_rounded,
+            label: "GC 💬",
+            isPrimary: hasPassengers ? false : true,
+            isLoading: _isRequesting,
+            isDark: isDark,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPassengerFooter(String status, bool isFull, bool isDark) {
+    if (status == 'in_progress' && _requestStatus == 'accepted') {
+      // Ongoing ride for accepted passenger
+      return Row(
+        children: [
+          Expanded(
+            child: _CustomButton(
+              onTap: _handleChat,
+              icon: Icons.chat_bubble_outline_rounded,
+              label: "Chat Host",
+              isPrimary: false,
+              isDark: isDark,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _CustomButton(
+              onTap: _handleEnterGC,
+              icon: Icons.forum_rounded,
+              label: "Enter GC 💬",
+              isPrimary: true,
+              isLoading: _isRequesting,
+              isDark: isDark,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Default passenger footer
+    return Row(
+      children: [
+        Expanded(
+          flex: 1,
+          child: _CustomButton(
+            onTap: _handleChat,
+            icon: Icons.chat_bubble_outline_rounded,
+            label: "Chat with Host",
+            isPrimary: false,
+            isDark: isDark,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 1,
+          child: _requestStatus == 'accepted'
+              ? _CustomButton(
+                  onTap: _handleEnterGC,
+                  icon: Icons.forum_rounded,
+                  label: "Enter GC 💬",
+                  isPrimary: true,
+                  isLoading: _isRequesting,
+                  isDark: isDark,
+                )
+              : _requestStatus == 'pending'
+                  ? _CustomButton(
+                      onTap: null,
+                      icon: Icons.hourglass_top_rounded,
+                      label: "Requested ⏳",
+                      isPrimary: false,
+                      isDark: isDark,
+                    )
+                  : _CustomButton(
+                      onTap: isFull ? null : _handleJoinRequest,
+                      label: isFull ? "Ride Full" : "Request to Join",
+                      isPrimary: true,
+                      isLoading: _isRequesting,
+                      isDark: isDark,
                     ),
-                  ],
-                ),
+        ),
+      ],
     );
   }
 }

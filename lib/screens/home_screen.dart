@@ -10,6 +10,8 @@ import 'offer_ride_screen.dart';
 import 'available_rides.dart';
 import 'notifications_screen.dart';
 import 'group_rides_screen.dart';
+import 'settings_screen.dart';
+import 'ongoing_ride_screen.dart';
 
 class RydenHome extends StatefulWidget {
   const RydenHome({super.key});
@@ -68,6 +70,7 @@ class _RydenHomeState extends State<RydenHome> {
             padding: const EdgeInsets.fromLTRB(0, 40, 0, 100),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                _buildActiveRideBanner(),
                 _sectionHeader("Quick Actions", false),
                 _buildQuickActionsGrid(),
                 const SizedBox(height: 5),
@@ -118,7 +121,10 @@ class _RydenHomeState extends State<RydenHome> {
               children: [
                 _notificationBell(),
                 const SizedBox(width: 12),
-                _headerIcon(Icons.settings_outlined),
+                GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                  child: _headerIcon(Icons.settings_outlined),
+                ),
               ],
             ),
           ],
@@ -193,6 +199,7 @@ class _RydenHomeState extends State<RydenHome> {
   }
 
   Widget _buildSearchBar() => GestureDetector(
+    behavior: HitTestBehavior.opaque,
     onTap: () {
       Navigator.push(
         context,
@@ -216,11 +223,11 @@ class _RydenHomeState extends State<RydenHome> {
           child: Text("Where are you heading?", style: TextStyle(color: Color(0xFF9BA5B0), fontSize: 15)),
         ),
         Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: const Color(0xFFF4F7F9), borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(6),
+          decoration: BoxDecoration(color: const Color(0xFFF4F7F9), borderRadius: BorderRadius.circular(14)),
           child: const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Icon(Icons.tune_rounded, color: Color(0xFF2E7CF6), size: 20),
+            padding: EdgeInsets.all(10.0),
+            child: Icon(Icons.tune_rounded, color: Color(0xFF2E7CF6), size: 22),
           ),
         ),
       ]),
@@ -292,7 +299,7 @@ class _RydenHomeState extends State<RydenHome> {
                   Icon(Icons.directions_car_outlined, size: 50, color: Colors.grey.shade300),
                   const SizedBox(height: 12),
                   Text(
-                    "No rides available yet",
+                    "Nothing yet",
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -341,4 +348,97 @@ class _RydenHomeState extends State<RydenHome> {
       ],
     ),
   );
+
+  Widget _buildActiveRideBanner() {
+    return StreamBuilder<Map<String, String>?>(
+      stream: FirestoreService.getActiveRideInfo(),
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        if (info == null) return const SizedBox.shrink();
+
+        final from = info['from'] ?? '';
+        final to = info['to'] ?? '';
+        final role = info['role'] ?? '';
+        final type = info['type'] ?? 'ride';
+        final rideId = info['rideId'] ?? '';
+        final isGroup = type == 'group_ride';
+
+        return GestureDetector(
+          onTap: () {
+            if (!isGroup) {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => OngoingRideScreen(rideId: rideId)));
+            }
+          },
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF10B981), Color(0xFF34D399)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(color: const Color(0xFF10B981).withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8)),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Pulsing dot
+                Container(
+                  width: 12, height: 12,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: Colors.white54, blurRadius: 6, spreadRadius: 2),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isGroup ? 'Group Ride Active' : 'Ride in Progress',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$from → $to',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white70,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    role,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.white70),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

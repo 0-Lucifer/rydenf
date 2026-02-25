@@ -30,7 +30,20 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   static const Color kBorder = Color(0xFFE2E8F0);
 
   bool _isRequesting = false;
+  String _requestStatus = 'none'; // 'none', 'pending', 'accepted', 'rejected'
+  bool _isLoadingStatus = true;
   String? get _currentUid => AuthService.currentUser?.uid;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRequestStatus();
+  }
+
+  void _loadRequestStatus() async {
+    final status = await FirestoreService.getUserRequestStatusForRegularRide(widget.rideId);
+    if (mounted) setState(() { _requestStatus = status; _isLoadingStatus = false; });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -332,7 +345,9 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                     children: [
                       Row(
                         children: [
-                          Text(ride.driverName, style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: kTextMain)),
+                          Flexible(
+                            child: Text(ride.driverName, style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.w800, color: kTextMain)),
+                          ),
                           const SizedBox(width: 6),
                           Icon(Icons.open_in_new_rounded, size: 12, color: kAccent.withOpacity(0.5)),
                         ],
@@ -341,7 +356,9 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                         children: [
                           Icon(Icons.star_rounded, size: 14, color: hasRating ? Colors.amber : Colors.grey),
                           const SizedBox(width: 4),
-                          Text(hasRating ? ride.rating! : "No rating", style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: kTextMain)),
+                          Flexible(
+                            child: Text(hasRating ? ride.rating! : "No rating", style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: kTextMain)),
+                          ),
                           const SizedBox(width: 8),
                           Text("Verified Host", style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: kSuccess)),
                         ],
@@ -539,6 +556,13 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
 
     if (ride.status == 'full') return _disabledTag("FULL", kTextSub);
 
+    // Show status-aware button
+    if (_isLoadingStatus) {
+      return const SizedBox(height: 56, child: Center(child: CircularProgressIndicator(color: kAccent, strokeWidth: 2)));
+    }
+    if (_requestStatus == 'pending') return _disabledTag("REQUESTED ⏳", const Color(0xFFF59E0B));
+    if (_requestStatus == 'accepted') return _disabledTag("ACCEPTED ✓", kSuccess);
+
     return _actionBtnLarge(_isRequesting ? "SENDING..." : (ride.instantMatch ? "BOOK NOW" : "REQUEST SEAT"), _isRequesting ? null : () => _handleRequest(ride), kAccent);
   }
 
@@ -575,7 +599,12 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   Future<void> _handleRequest(Ride ride) async {
     setState(() => _isRequesting = true);
     final result = await FirestoreService.requestRide(rideId: ride.id!);
-    setState(() => _isRequesting = false);
+    setState(() {
+      _isRequesting = false;
+      if (result.success) {
+        _requestStatus = ride.instantMatch ? 'accepted' : 'pending';
+      }
+    });
     if (mounted) _showSnack(result.message, result.success);
   }
 

@@ -147,7 +147,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
               letterSpacing: 0.1,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+
+          // Rating display
+          if (profile != null && profile.totalRatings > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ...List.generate(5, (i) => Icon(
+                  i < profile.averageRating.round() ? Icons.star_rounded : Icons.star_outline_rounded,
+                  size: 20,
+                  color: i < profile.averageRating.round() ? const Color(0xFFFBBF24) : Colors.white38,
+                )),
+                const SizedBox(width: 8),
+                Text(
+                  '${profile.averageRating.toStringAsFixed(1)} (${profile.totalRatings} ${profile.totalRatings == 1 ? 'rating' : 'ratings'})',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white70,
+                  ),
+                ),
+              ],
+            )
+          else
+            Text(
+              'No ratings yet',
+              style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white54),
+            ),
+
+          const SizedBox(height: 20),
           _buildVerifiedBadge(),
         ],
       ),

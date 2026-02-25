@@ -25,6 +25,7 @@ Future<void> main() async {
   FirestoreService.cleanupOldRides();
   FirestoreService.cleanupExpiredGroupRides();
   FirestoreService.cleanupExpiredChats();
+  FirestoreService.cleanupExpiredRides();
 
   runApp(const RydenApp());
 }

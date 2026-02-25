@@ -120,12 +120,13 @@ class LocalNotificationService {
     _lastNotifiedMessageTime.clear();
 
     // ─── Listener 1: General notifications (rides, groups, approvals) ───
+    // Simple query: only filter by userId — avoids composite index requirement.
+    // Client-side filtering handles isRead.
     _notificationSub = FirebaseFirestore.instance
         .collection('notifications')
         .where('userId', isEqualTo: uid)
-        .where('isRead', isEqualTo: false)
         .orderBy('createdAt', descending: true)
-        .limit(10)
+        .limit(20)
         .snapshots()
         .listen((snapshot) {
       if (!_notificationListenerReady) {
@@ -146,6 +147,9 @@ class LocalNotificationService {
 
           final data = change.doc.data();
           if (data != null) {
+            // Skip already-read notifications
+            if (data['isRead'] == true) continue;
+
             final title = data['title'] as String? ?? '';
             final body = data['body'] as String? ?? '';
             if (title.isNotEmpty) {
@@ -159,6 +163,8 @@ class LocalNotificationService {
           }
         }
       }
+    }, onError: (error) {
+      print('[LocalNotificationService] Notification listener error: $error');
     });
 
     // ─── Listener 2: Chat messages ───
@@ -232,6 +238,8 @@ class LocalNotificationService {
           channelName: 'Chat Messages',
         );
       }
+    }, onError: (error) {
+      print('[LocalNotificationService] Chat listener error: $error');
     });
   }
 

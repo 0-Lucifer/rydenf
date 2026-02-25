@@ -243,18 +243,7 @@ class NotificationsScreen extends StatelessWidget {
     final timeAgo = _formatTimeAgo(notification.createdAt);
 
     return GestureDetector(
-      onTap: () {
-        if (!notification.isRead && notification.id != null) {
-          FirestoreService.markNotificationAsRead(notification.id!);
-        }
-        if (notification.rideId != null) {
-          if (notification.type == 'ride_started' || notification.type == 'ride_completed') {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => OngoingRideScreen(rideId: notification.rideId!)));
-          } else {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => RideDetailScreen(rideId: notification.rideId!)));
-          }
-        }
-      },
+      onTap: () => _handleNotificationTap(context, notification),
       child: Container(
         margin: const EdgeInsets.only(bottom: 20),
         decoration: BoxDecoration(
@@ -364,6 +353,11 @@ class NotificationsScreen extends StatelessWidget {
       case 'ride_started': return Icons.directions_car_filled_rounded;
       case 'ride_completed': return Icons.flag_rounded;
       case 'ride_cancelled': return Icons.block_flipped;
+      case 'group_ride_request': return Icons.group_add_rounded;
+      case 'group_ride_accepted': return Icons.group_rounded;
+      case 'group_ride_rejected': return Icons.group_off_rounded;
+      case 'group_ride_started': return Icons.directions_car_filled_rounded;
+      case 'group_ride_completed': return Icons.flag_rounded;
       default: return Icons.notifications_active_rounded;
     }
   }
@@ -376,6 +370,11 @@ class NotificationsScreen extends StatelessWidget {
       case 'ride_started': return kWarning;
       case 'ride_completed': return kSuccess;
       case 'ride_cancelled': return kDanger;
+      case 'group_ride_request': return kPrimary;
+      case 'group_ride_accepted': return kSuccess;
+      case 'group_ride_rejected': return kDanger;
+      case 'group_ride_started': return kWarning;
+      case 'group_ride_completed': return kSuccess;
       default: return kPrimary;
     }
   }
@@ -388,5 +387,129 @@ class NotificationsScreen extends StatelessWidget {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return DateFormat('MMM dd').format(dateTime);
+  }
+
+  // ─── Notification Tap Routing ──────────────────────────
+
+  void _handleNotificationTap(BuildContext context, AppNotification notification) async {
+    // Mark as read
+    if (!notification.isRead && notification.id != null) {
+      FirestoreService.markNotificationAsRead(notification.id!);
+    }
+
+    final type = notification.type;
+    final rideId = notification.rideId;
+    if (rideId == null) return;
+
+    // Group ride notifications
+    if (type.startsWith('group_ride_')) {
+      if (type == 'group_ride_completed') {
+        _showCompletedPopup(context, notification, isGroup: true);
+      } else {
+        // For group ride request/accepted/rejected/started: 
+        // Show a snackbar since the group ride screen uses a stream
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Check the Group Rides tab for details',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+            ),
+            backgroundColor: kPrimary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Regular ride notifications
+    if (type == 'ride_completed') {
+      _showCompletedPopup(context, notification, isGroup: false);
+      return;
+    }
+
+    if (type == 'ride_started') {
+      // Ongoing ride → navigate to ongoing screen
+      Navigator.push(context, MaterialPageRoute(builder: (_) => OngoingRideScreen(rideId: rideId)));
+      return;
+    }
+
+    if (type == 'ride_accepted' || type == 'ride_request') {
+      // Check if ride is in_progress → go to ongoing screen, otherwise detail screen
+      try {
+        final ride = await FirestoreService.getRide(rideId);
+        if (ride != null && context.mounted) {
+          if (ride.status == 'in_progress') {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => OngoingRideScreen(rideId: rideId)));
+          } else {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => RideDetailScreen(rideId: rideId)));
+          }
+        }
+      } catch (_) {
+        if (context.mounted) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => RideDetailScreen(rideId: rideId)));
+        }
+      }
+      return;
+    }
+
+    // Fallback — ride detail screen
+    Navigator.push(context, MaterialPageRoute(builder: (_) => RideDetailScreen(rideId: rideId)));
+  }
+
+  void _showCompletedPopup(BuildContext context, AppNotification notification, {required bool isGroup}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        contentPadding: const EdgeInsets.fromLTRB(32, 32, 32, 24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72, height: 72,
+              decoration: BoxDecoration(
+                color: kSuccess.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_circle_rounded, size: 40, color: kSuccess),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              isGroup ? 'Group Ride Completed' : 'Ride Completed',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 20, fontWeight: FontWeight.w900, color: kTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              notification.body,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14, color: kTextSecondary, height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kSuccess,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                child: Text('Got it!', style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white,
+                )),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

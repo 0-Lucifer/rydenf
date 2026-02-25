@@ -12,7 +12,20 @@
           "package_name": "com.example.ryden"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "318410227659-s9i5gc73r1co4ebtb780u7sihslpdktp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ryden",
+            "certificate_hash": "eabd9b1aa5e84fc0e36f30670dbef32def897fdc"
+          }
+        },
+        {
+          "client_id": "318410227659-8378v3rcvrmrcvabqkvcqp4toqdnfv80.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDk1s5IbMw_MqwAptGqVm9Nx8Hi8qlizjg"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "318410227659-8378v3rcvrmrcvabqkvcqp4toqdnfv80.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "318410227659-3s25144qa9sfatpcv20cv8sgspdf6o52.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.ryden"
+              }
+            }
+          ]
         }
       }
     }

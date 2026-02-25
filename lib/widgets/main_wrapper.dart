@@ -33,6 +33,7 @@ class _MainWrapperState extends State<MainWrapper> {
     // Cleanup expired data on app start
     FirestoreService.cleanupExpiredChats();
     FirestoreService.cleanupExpiredGroupRides();
+    FirestoreService.cleanupExpiredRides();
     // Start listening for push notifications
     LocalNotificationService.instance.startListening();
   }

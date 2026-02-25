@@ -10,6 +10,8 @@ class UserProfile {
   final String gender;
   final String phone;
   final String photoUrl;
+  final double averageRating;
+  final int totalRatings;
   final DateTime createdAt;
 
   UserProfile({
@@ -22,6 +24,8 @@ class UserProfile {
     this.gender = '',
     this.phone = '',
     this.photoUrl = '',
+    this.averageRating = 0.0,
+    this.totalRatings = 0,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -36,6 +40,8 @@ class UserProfile {
       'gender': gender,
       'phone': phone,
       'photoUrl': photoUrl,
+      'averageRating': averageRating,
+      'totalRatings': totalRatings,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
@@ -51,6 +57,8 @@ class UserProfile {
       gender: map['gender'] ?? '',
       phone: map['phone'] ?? '',
       photoUrl: map['photoUrl'] ?? '',
+      averageRating: (map['averageRating'] ?? 0.0).toDouble(),
+      totalRatings: map['totalRatings'] ?? 0,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/ride_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../widgets/rating_dialog.dart';
 
 class OngoingRideScreen extends StatelessWidget {
   final String rideId;
@@ -447,13 +448,13 @@ class OngoingRideScreen extends StatelessWidget {
               height: 56,
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
-                label: Text("Done", style: GoogleFonts.plusJakartaSans(
+                onPressed: () => _showRatingAndPop(context, ride),
+                icon: const Icon(Icons.star_rounded, color: Colors.white),
+                label: Text("Rate & Done", style: GoogleFonts.plusJakartaSans(
                   fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white,
                 )),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kTextSecondary,
+                  backgroundColor: const Color(0xFFF59E0B),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 0,
                 ),
@@ -502,7 +503,7 @@ class OngoingRideScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text("Complete Ride?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
         content: Text(
-          "Mark this ride as completed. All passengers will see the ride as finished.",
+          "Mark this ride as completed. You'll be able to rate passengers next.",
           style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
         ),
         actions: [
@@ -534,6 +535,39 @@ class OngoingRideScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Show rating dialog(s) then navigate back
+  void _showRatingAndPop(BuildContext context, Ride ride) async {
+    final isDriver = ride.driverId == AuthService.currentUser?.uid;
+
+    if (isDriver) {
+      // Driver rates each passenger
+      if (ride.passengers.isNotEmpty) {
+        final profiles = await FirestoreService.getProfiles(ride.passengers);
+        if (context.mounted) {
+          await showSequentialRatingDialogs(
+            context,
+            users: profiles,
+            rideId: ride.id!,
+            rideType: 'ride',
+          );
+        }
+      }
+    } else {
+      // Passenger rates the driver
+      final driverProfile = await FirestoreService.getUserProfile(ride.driverId);
+      if (driverProfile != null && context.mounted) {
+        await showRatingDialog(
+          context,
+          targetUser: driverProfile,
+          rideId: ride.id!,
+          rideType: 'ride',
+        );
+      }
+    }
+
+    if (context.mounted) Navigator.pop(context);
   }
 
   // ───────────────────────────────────────────────────────

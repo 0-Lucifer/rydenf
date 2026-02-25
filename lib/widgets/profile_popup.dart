@@ -139,6 +139,38 @@ class _ProfileSheetContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
+
+          // Rating display
+          if (profile.totalRatings > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ...List.generate(5, (i) => Icon(
+                    i < profile.averageRating.round() ? Icons.star_rounded : Icons.star_outline_rounded,
+                    size: 18,
+                    color: i < profile.averageRating.round() ? const Color(0xFFF59E0B) : Colors.grey[300],
+                  )),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${profile.averageRating.toStringAsFixed(1)} (${profile.totalRatings})',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13, fontWeight: FontWeight.w700, color: kMuted,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                'No ratings yet',
+                style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kMuted, fontWeight: FontWeight.w600),
+              ),
+            ),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
