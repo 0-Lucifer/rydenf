@@ -6,10 +6,8 @@ import 'package:geocoding/geocoding.dart' as geo;
 import '../services/location_service.dart';
 import '../services/places_service.dart';
 
-/// Full-screen Uber-style map location picker.
-///
-/// Shows a Google Map with a fixed center pin. User drags the map to move
-/// the pin, or searches by name. Returns (name, lat, lng) on confirm.
+/// A full-screen map picker inspired by Uber. 
+/// It keeps the pin fixed in the center while the user moves the map around.
 class MapLocationPicker extends StatefulWidget {
   final String title;
   final LatLng? initialPosition;
@@ -22,7 +20,7 @@ class MapLocationPicker extends StatefulWidget {
     this.accentColor = const Color(0xFF4F46E5),
   });
 
-  /// Opens the picker and returns `(name, lat, lng)` or null if cancelled.
+  // Launches the map screen and patiently waits for the result
   static Future<({String name, double lat, double lng})?> pick(
     BuildContext context, {
     String title = 'Pick Location',
@@ -83,7 +81,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     super.dispose();
   }
 
-  // ── Reverse geocode the center pin position ────────────
+  // Takes map coordinates and turns them into a readable address sting
   Future<void> _reverseGeocode(LatLng pos) async {
     setState(() => _isResolvingAddress = true);
     try {
@@ -118,7 +116,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     }
   }
 
-  // ── Go to user's GPS location ──────────────────────────
+  // Grab the phone's GPS and fly the camera there
   Future<void> _goToMyLocation({bool animate = true}) async {
     setState(() => _isLoadingGps = true);
     final pos = await LocationService.getCurrentPosition();
@@ -143,7 +141,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     }
   }
 
-  // ── Search places ──────────────────────────────────────
+  // Handling the search bar at the top
   void _onSearchChanged(String query) {
     _debounce?.cancel();
     if (query.trim().length < 2) {
@@ -184,7 +182,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     }
   }
 
-  // ── Confirm and return ─────────────────────────────────
+  // User hit the confirm button. Pass these values back.
   void _confirm() {
     Navigator.of(context).pop((
       name: _resolvedAddress,
@@ -193,7 +191,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     ));
   }
 
-  // ── Camera idle → resolve address ──────────────────────
+  // Update the text at the bottom when the user stops moving the map
   void _onCameraIdle() {
     _reverseGeocode(_currentCenter);
   }
@@ -208,7 +206,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // ── Google Map ──
+          // The actual interactive map
           GoogleMap(
             initialCameraPosition: CameraPosition(
               target: _currentCenter,
@@ -224,7 +222,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
             compassEnabled: false,
           ),
 
-          // ── Center pin (fixed) ──
+          // This is the custom pin that stays glued to the center
           Center(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 36),
@@ -262,7 +260,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
             ),
           ),
 
-          // ── Top bar: back + search ──
+          // The search bar and back button sitting over the map
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -286,7 +284,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
             ),
           ),
 
-          // ── My location FAB ──
+          // The floating button to re-center on my GPS
           Positioned(
             right: 16,
             bottom: 240,
@@ -309,7 +307,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
             ),
           ),
 
-          // ── Bottom panel: address + confirm ──
+          // The white card at the bottom containing the address and confirm button
           Align(
             alignment: Alignment.bottomCenter,
             child: _bottomPanel(),

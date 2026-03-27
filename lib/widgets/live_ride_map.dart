@@ -8,11 +8,9 @@ import '../services/location_service.dart';
 import '../services/firestore_service.dart';
 import '../services/routes_service.dart';
 
-/// A live-tracking Google Map for ongoing rides.
-///
-/// - Shows origin/destination markers and route polyline
-/// - If [isDriver] is true, streams GPS to Firestore every 30s
-/// - Shows the driver's live position (blue dot) from Firestore for passengers
+/// Map widget that keeps track of active rides.
+/// Shows the route between origin and destination, and if it's the driver looking at it,
+/// it sends their GPS to Firestore every 30 seconds. Passengers just see the blue dot moving.
 class LiveRideMap extends StatefulWidget {
   final Ride ride;
   final bool isDriver;
@@ -85,7 +83,7 @@ class _LiveRideMapState extends State<LiveRideMap> {
     super.dispose();
   }
 
-  // ── Fetch route polyline ───────────────────────────────
+  // Get the route from Google so we can draw the blue line on the map
   Future<void> _fetchRoute() async {
     if (!_hasCoordinates) return;
     setState(() => _isLoadingRoute = true);
@@ -115,7 +113,7 @@ class _LiveRideMapState extends State<LiveRideMap> {
     }
   }
 
-  // ── Driver GPS streaming (every 30s) ───────────────────
+  // Start pinging Firestore with the driver's location every half minute
   void _startDriverLocationStream() {
     // Send immediately on start
     _updateDriverPosition();
@@ -140,7 +138,7 @@ class _LiveRideMapState extends State<LiveRideMap> {
     }
   }
 
-  // ── Fit bounds ─────────────────────────────────────────
+  // Zoom the map so all the markers fit on the screen nicely
   void _fitBounds() {
     if (_mapController == null || !_hasCoordinates) return;
 
@@ -168,7 +166,7 @@ class _LiveRideMapState extends State<LiveRideMap> {
     );
   }
 
-  // ── Build markers ──────────────────────────────────────
+  // Create the pins for pickup, dropoff, and the driver's current spot
   Set<Marker> _buildMarkers() {
     final markers = <Marker>{};
 
@@ -205,7 +203,7 @@ class _LiveRideMapState extends State<LiveRideMap> {
     return markers;
   }
 
-  // ── Polyline decoder ───────────────────────────────────
+  // Turning Google's weird encoded polyline string into actual map coordinates
   List<LatLng> _decodePolyline(String encoded) {
     final List<LatLng> points = [];
     int index = 0;

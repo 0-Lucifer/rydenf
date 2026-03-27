@@ -9,9 +9,9 @@ import '../config/app_config.dart';
 class ForceUpdateService {
   ForceUpdateService._();
 
-  // Store URLs are centralized in AppConfig
+  // I moved the store URLs to AppConfig so they are easy to change later
 
-  /// Call once from MainWrapper.initState to gate the app.
+  // Run this check when the app starts. If the version is too old, it blocks them.
   static Future<void> checkAndPrompt(BuildContext context) async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -37,7 +37,7 @@ class ForceUpdateService {
     }
   }
 
-  /// Semantic-version compare: returns true if [current] < [minimum].
+  // Checks if my current version is older than what Firestore says is the minimum required
   static bool _isOlderThan(String current, String minimum) {
     final cur = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
     final min = minimum.split('.').map((e) => int.tryParse(e) ?? 0).toList();
@@ -53,7 +53,7 @@ class ForceUpdateService {
     return false; // equal — not older
   }
 
-  // ── Non-dismissible premium dialog ─────────────────────
+  // A sweet-looking dialog that forces the user to the app store. They can't dismiss it.
   static void _showForceUpdateDialog(BuildContext context, String minVersion) {
     showDialog(
       context: context,
@@ -70,7 +70,7 @@ class ForceUpdateService {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Icon ──
+                // Big update icon using our brand colors
                 Container(
                   width: 80,
                   height: 80,
@@ -93,7 +93,7 @@ class ForceUpdateService {
                 ),
                 const SizedBox(height: 24),
 
-                // ── Title ──
+                // Main header
                 Text(
                   'Update Required',
                   style: GoogleFonts.plusJakartaSans(
@@ -105,7 +105,7 @@ class ForceUpdateService {
                 ),
                 const SizedBox(height: 12),
 
-                // ── Body ──
+                // Explanatory text and version info
                 Text(
                   'A new version of Ryden is available.\n'
                   'Please update to continue using the app.',
@@ -128,7 +128,7 @@ class ForceUpdateService {
                 ),
                 const SizedBox(height: 28),
 
-                // ── Update Button ──
+                // The button that actually redirects them out of the app
                 SizedBox(
                   width: double.infinity,
                   height: 52,

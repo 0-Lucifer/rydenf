@@ -16,12 +16,12 @@ class FirestoreService {
 
   static String? get _uid => _auth.currentUser?.uid;
 
-  // ── Profile cache (avoids repeated reads) ──
+  // Cache to avoid reading the same profile over and over
   static final Map<String, _CachedProfile> _profileCache = {};
   static const _profileCacheTTL = Duration(minutes: 5);
   static void clearProfileCache() => _profileCache.clear();
 
-  // ── Batch chunking helper (Firestore limit = 500 ops per batch) ──
+  // Helper to split big writes into batches under 500 ops
   static Future<void> _commitInChunks(List<void Function(WriteBatch)> ops) async {
     const maxOps = 450; // leave headroom below Firestore's 500 limit
     for (var i = 0; i < ops.length; i += maxOps) {
@@ -34,9 +34,9 @@ class FirestoreService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
   //  USER PROFILE
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
 
   static Future<void> createUserProfile({
     required String uid,
@@ -123,9 +123,9 @@ class FirestoreService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
   //  RIDES
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
 
   static Future<({bool success, String message})> publishRide(Ride ride) async {
     try {
@@ -137,7 +137,7 @@ class FirestoreService {
     }
   }
 
-  /// Stream all active rides — no compound query, filter + sort client-side
+  /// Returns all active rides. I do filtering and sorting on the UI side.
   static Stream<List<Ride>> getAvailableRidesStream() {
     return _db
         .collection('rides')
@@ -158,7 +158,7 @@ class FirestoreService {
         });
   }
 
-  /// Stream rides the current user created — single where, sort client-side
+  /// Listen to rides I've created
   static Stream<List<Ride>> getUserRidesStream() {
     if (_uid == null) return Stream.value([]);
     return _db
@@ -320,11 +320,11 @@ class FirestoreService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
   //  RIDE REQUESTS
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
 
-  /// Request a seat — auto-accepted if instant booking, pending otherwise
+  /// Try to join a ride. If it's instant match, accept it right away.
   static Future<({bool success, String message})> requestRide({
     required String rideId,
     int seatsRequested = 1,
@@ -365,7 +365,7 @@ class FirestoreService {
       }
 
       if (isInstant) {
-        // ── INSTANT BOOKING: transaction to prevent overbooking ──
+        // Instant mode enabled: use a transaction so we don't accidentally overbook seats
         final uid = _uid!;
         await _db.runTransaction((txn) async {
           final freshRide = await txn.get(_db.collection('rides').doc(rideId));
@@ -419,7 +419,7 @@ class FirestoreService {
 
         return (success: true, message: 'Booked instantly! You\'re confirmed.');
       } else {
-        // ── MANUAL APPROVAL: pending request ──
+        // Normal mode: put the request into pending state so the driver can approve it later
         final request = RideRequest(
           rideId: rideId,
           passengerId: _uid!,
@@ -695,9 +695,9 @@ class FirestoreService {
     });
   }
 
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
   //  NOTIFICATIONS
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
 
   /// Send a notification to a specific user
   static Future<void> sendNotification({
@@ -784,9 +784,9 @@ class FirestoreService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
   //  GROUP RIDES
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
 
   /// Publish a new group ride
   static Future<({bool success, String message})> publishGroupRide(GroupRide ride) async {
@@ -1193,9 +1193,9 @@ class FirestoreService {
   }
 
 
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
   //  GROUP RIDE REQUEST MANAGEMENT (Host Actions)
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
 
   /// Stream requests for a specific group ride
   static Stream<List<GroupRideRequest>> getGroupRideRequestsStream(String groupRideId) {
@@ -1433,9 +1433,9 @@ class FirestoreService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
   //  RATING SYSTEM
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
 
   /// Submit a rating — writes to ratings collection and atomically updates target user's profile
   static Future<({bool success, String message})> submitRating({
@@ -1521,9 +1521,9 @@ class FirestoreService {
     return profiles;
   }
 
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
   //  CHAT SYSTEM
-  // ═══════════════════════════════════════════════════════
+  // ==========================================
 
   /// Create or get an existing personal chat room
   static Future<ChatRoom?> createOrGetPersonalChat(String otherUserId) async {
