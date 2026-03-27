@@ -308,6 +308,18 @@ class FirestoreService {
     }
   }
 
+  /// Update driver's live GPS location on an in_progress ride (called every 30s)
+  static Future<void> updateDriverLocation(String rideId, double lat, double lng) async {
+    try {
+      await _db.collection('rides').doc(rideId).update({
+        'driverLat': lat,
+        'driverLng': lng,
+      });
+    } catch (e) {
+      print('[FirestoreService] updateDriverLocation error: $e');
+    }
+  }
+
   // ═══════════════════════════════════════════════════════
   //  RIDE REQUESTS
   // ═══════════════════════════════════════════════════════

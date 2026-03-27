@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/ride_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../widgets/place_autocomplete_field.dart';
+import '../widgets/ride_map_preview.dart';
 
 enum GenderPreference { both, male, female }
 
@@ -33,6 +35,12 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
   ];
 
   late TextEditingController _priceController;
+
+  // Coordinate tracking for each location
+  final List<double?> _lats = [null, null];
+  final List<double?> _lngs = [null, null];
+  double? _distanceKm;
+  int? _durationMinutes;
 
   // Design Constants - Refined Palette
   final Color kPrimaryColor = const Color(0xFF4F46E5);
@@ -65,6 +73,8 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
       _vibrate();
       setState(() {
         _locations.insert(_locations.length - 1, TextEditingController());
+        _lats.insert(_lats.length - 1, null);
+        _lngs.insert(_lngs.length - 1, null);
       });
     }
   }
@@ -74,6 +84,8 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
     setState(() {
       _locations[index].dispose();
       _locations.removeAt(index);
+      _lats.removeAt(index);
+      _lngs.removeAt(index);
     });
   }
 
@@ -133,6 +145,12 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
       genderPreference: _genderPreference.name,
       pricePerSeat: double.tryParse(_priceController.text) ?? 50.0,
       instantMatch: _instantBooking,
+      originLat: _lats.first,
+      originLng: _lngs.first,
+      destinationLat: _lats.last,
+      destinationLng: _lngs.last,
+      distanceKm: _distanceKm,
+      durationMinutes: _durationMinutes,
     );
 
     final result = await FirestoreService.publishRide(ride);
@@ -214,8 +232,26 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
                       _sectionLabel("ITINERARY"),
                       _buildRouteCard(),
                       
-                      const SizedBox(height: 20),
+                      // Show map preview when both locations have coordinates
+                      if (_lats.first != null && _lngs.first != null &&
+                          _lats.last != null && _lngs.last != null) ...[
+                        const SizedBox(height: 16),
+                        RideMapPreview(
+                          originLat: _lats.first,
+                          originLng: _lngs.first,
+                          destLat: _lats.last,
+                          destLng: _lngs.last,
+                          height: 180,
+                          onRouteCalculated: (info) {
+                            setState(() {
+                              _distanceKm = info.distanceKm;
+                              _durationMinutes = info.durationMinutes;
+                            });
+                          },
+                        ),
+                      ],
                       
+                      const SizedBox(height: 20),
                       _sectionLabel("DATE & TRANSPORT"),
                       _buildDetailsGrid(),
                       
@@ -402,20 +438,16 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
         Expanded(
           child: Column(
             children: [
-              TextField(
+              PlaceAutocompleteField(
                 controller: _locations[index],
-                style: GoogleFonts.plusJakartaSans(
-                  fontWeight: FontWeight.w600, 
-                  fontSize: 15,
-                  color: kTextPrimary,
-                ),
-                decoration: InputDecoration(
-                  hintText: isFirst ? "Where from?" : (isLast ? "Where to?" : "Stopover location"),
-                  hintStyle: TextStyle(color: Colors.grey.shade300, fontSize: 15, fontWeight: FontWeight.w500),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                ),
+                hintText: isFirst ? "Where from?" : (isLast ? "Where to?" : "Stopover location"),
+                markerColor: isFirst ? kPrimaryColor : (isLast ? kAccentRed : const Color(0xFFF59E0B)),
+                onPlaceSelected: (name, lat, lng) {
+                  setState(() {
+                    _lats[index] = lat;
+                    _lngs[index] = lng;
+                  });
+                },
               ),
               if (!isLast) const SizedBox(height: 12),
             ],

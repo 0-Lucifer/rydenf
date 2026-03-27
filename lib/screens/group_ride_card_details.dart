@@ -6,6 +6,7 @@ import '../models/group_ride_model.dart';
 import '../services/firestore_service.dart';
 import '../widgets/profile_popup.dart';
 import '../widgets/rating_dialog.dart';
+import '../widgets/ride_map_preview.dart';
 import 'group_ride_requests_screen.dart';
 import 'chat_screen.dart';
 
@@ -258,6 +259,17 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
                       _buildStatsGrid(isDark),
                       const SizedBox(height: 32),
                       _buildRouteSection(isDark),
+                      if (widget.ride.hasCoordinates) ...[
+                        const SizedBox(height: 20),
+                        RideMapPreview(
+                          originLat: widget.ride.fromLat,
+                          originLng: widget.ride.fromLng,
+                          destLat: widget.ride.toLat,
+                          destLng: widget.ride.toLng,
+                          height: 180,
+                          showRouteInfo: true,
+                        ),
+                      ],
                       const SizedBox(height: 32),
                       _buildHostSection(isDark),
                       const SizedBox(height: 32),

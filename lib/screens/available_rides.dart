@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../widgets/premium_pickers.dart';
 import '../models/ride_model.dart';
 import '../widgets/ride_card.dart';
+import '../widgets/place_autocomplete_field.dart';
 import '../services/firestore_service.dart';
 
 class AvailableRidesScreen extends StatefulWidget {
@@ -210,17 +211,13 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
         Icon(icon, size: 20, color: color),
         const SizedBox(width: 14),
         Expanded(
-          child: TextField(
+          child: PlaceAutocompleteField(
             controller: controller,
-            onChanged: (_) => _updateFilters(),
-            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 15),
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            hintText: hint,
+            markerColor: color,
+            onPlaceSelected: (name, lat, lng) {
+              _updateFilters();
+            },
           ),
         ),
       ],

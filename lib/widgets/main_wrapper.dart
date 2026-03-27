@@ -8,6 +8,7 @@ import '../screens/notifications_screen.dart';
 import '../screens/chat_list_screen.dart';
 import '../services/firestore_service.dart';
 import '../services/local_notification_service.dart';
+import '../services/force_update_service.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -36,6 +37,10 @@ class _MainWrapperState extends State<MainWrapper> {
     FirestoreService.cleanupExpiredRides();
     // Start listening for push notifications
     LocalNotificationService.instance.startListening();
+    // Check for forced app update (runs after first frame)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ForceUpdateService.checkAndPrompt(context);
+    });
   }
 
   Future<bool> _onWillPop() async {

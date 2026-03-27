@@ -18,6 +18,14 @@ class GroupRide {
   final List<String> passengers; // accepted passenger UIDs
   final DateTime createdAt;
 
+  // GPS coordinates (nullable for backward compat)
+  final double? fromLat;
+  final double? fromLng;
+  final double? toLat;
+  final double? toLng;
+  final double? distanceKm;
+  final int? durationMinutes;
+
   GroupRide({
     this.id,
     required this.hostId,
@@ -34,10 +42,20 @@ class GroupRide {
     this.notes = '',
     this.status = 'active',
     this.passengers = const [],
+    this.fromLat,
+    this.fromLng,
+    this.toLat,
+    this.toLng,
+    this.distanceKm,
+    this.durationMinutes,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
   bool get isFull => seatsAvailable <= 0 || status == 'full';
+
+  /// Whether this ride has GPS coordinates.
+  bool get hasCoordinates =>
+      fromLat != null && fromLng != null && toLat != null && toLng != null;
 
   Map<String, dynamic> toMap() {
     return {
@@ -56,6 +74,12 @@ class GroupRide {
       'status': status,
       'passengers': passengers,
       'createdAt': Timestamp.fromDate(createdAt),
+      if (fromLat != null) 'fromLat': fromLat,
+      if (fromLng != null) 'fromLng': fromLng,
+      if (toLat != null) 'toLat': toLat,
+      if (toLng != null) 'toLng': toLng,
+      if (distanceKm != null) 'distanceKm': distanceKm,
+      if (durationMinutes != null) 'durationMinutes': durationMinutes,
     };
   }
 
@@ -76,6 +100,12 @@ class GroupRide {
       notes: map['notes'] ?? '',
       status: map['status'] ?? 'active',
       passengers: List<String>.from(map['passengers'] ?? []),
+      fromLat: (map['fromLat'] as num?)?.toDouble(),
+      fromLng: (map['fromLng'] as num?)?.toDouble(),
+      toLat: (map['toLat'] as num?)?.toDouble(),
+      toLng: (map['toLng'] as num?)?.toDouble(),
+      distanceKm: (map['distanceKm'] as num?)?.toDouble(),
+      durationMinutes: map['durationMinutes'] as int?,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }

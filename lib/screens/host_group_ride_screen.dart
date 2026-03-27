@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../widgets/premium_pickers.dart';
+import '../widgets/place_autocomplete_field.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/group_ride_model.dart';
 import '../services/firestore_service.dart';
@@ -26,6 +27,9 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = const TimeOfDay(hour: 17, minute: 30);
   final TextEditingController _notesController = TextEditingController();
+
+  // Coordinate tracking
+  double? _fromLat, _fromLng, _toLat, _toLng;
 
   // Premium Theme Palette
   static const Color kPrimaryBlue = Color(0xFF2E7CF6);
@@ -101,6 +105,10 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
       seatsTotal: _seatsAvailable,
       seatsAvailable: _seatsAvailable,
       notes: _notesController.text.trim(),
+      fromLat: _fromLat,
+      fromLng: _fromLng,
+      toLat: _toLat,
+      toLng: _toLng,
     );
 
     // Show loading
@@ -272,6 +280,10 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
                           label: "Pickup Location",
                           hint: "e.g. NSU Main Gate",
                           isDark: isDark,
+                          markerColor: kPrimaryBlue,
+                          onPlaceSelected: (name, lat, lng) {
+                            setState(() { _fromLat = lat; _fromLng = lng; });
+                          },
                         ),
                         Divider(height: 1, color: isDark ? Colors.white10 : kBorderColor),
                         _buildRouteInputField(
@@ -279,6 +291,10 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
                           label: "Destination",
                           hint: "e.g. Banani 11",
                           isDark: isDark,
+                          markerColor: const Color(0xFFEF4444),
+                          onPlaceSelected: (name, lat, lng) {
+                            setState(() { _toLat = lat; _toLng = lng; });
+                          },
                         ),
                       ],
                     ),
@@ -297,6 +313,8 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
     required String label,
     required String hint,
     required bool isDark,
+    required Color markerColor,
+    required void Function(String name, double lat, double lng) onPlaceSelected,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -311,20 +329,11 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
               letterSpacing: 0.5
             )
           ),
-          TextField(
+          PlaceAutocompleteField(
             controller: controller,
-            style: GoogleFonts.plusJakartaSans(
-              fontWeight: FontWeight.w700, 
-              fontSize: 16, 
-              color: isDark ? Colors.white : kContentColor
-            ),
-            decoration: InputDecoration(
-              hintText: hint, 
-              hintStyle: TextStyle(color: kSecondaryText.withOpacity(0.3)), 
-              border: InputBorder.none, 
-              isDense: true, 
-              contentPadding: const EdgeInsets.symmetric(vertical: 8)
-            ),
+            hintText: hint,
+            markerColor: markerColor,
+            onPlaceSelected: onPlaceSelected,
           ),
         ],
       ),

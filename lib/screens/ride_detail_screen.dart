@@ -6,6 +6,7 @@ import '../models/ride_request_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../widgets/profile_popup.dart';
+import '../widgets/ride_map_preview.dart';
 import 'chat_screen.dart';
 import 'ongoing_ride_screen.dart';
 
@@ -90,6 +91,17 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildLocationCard(ride),
+                          if (ride.hasCoordinates) ...[
+                            const SizedBox(height: 20),
+                            RideMapPreview(
+                              originLat: ride.originLat,
+                              originLng: ride.originLng,
+                              destLat: ride.destinationLat,
+                              destLng: ride.destinationLng,
+                              height: 200,
+                              showRouteInfo: true,
+                            ),
+                          ],
                           const SizedBox(height: 32),
                           _buildGridSpecs(ride),
                           const SizedBox(height: 32),

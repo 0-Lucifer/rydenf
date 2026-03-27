@@ -114,17 +114,6 @@ class NotificationsScreen extends StatelessWidget {
           ),
         ),
       ),
-      leadingWidth: horizontalPadding + 50,
-      leading: Padding(
-        padding: EdgeInsets.only(left: horizontalPadding),
-        child: Center(
-          child: _buildGlassAction(
-              Icons.arrow_back_ios_new_rounded,
-                  () => Navigator.pop(context),
-              isDark
-          ),
-        ),
-      ),
       actions: [
         _buildMarkAllReadAction(isDark),
         SizedBox(width: horizontalPadding),

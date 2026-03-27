@@ -43,3 +43,18 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android local.properties (contains API keys & local SDK paths)
+android/local.properties
+
+# Temporary Firestore seed scripts (do not commit)
+lib/scripts/
+
+# Environment variables (API keys - NEVER commit)
+.env
+*.env
+!.env.example
+
+# iOS API key secrets (NEVER commit)
+ios/Runner/Secrets.xcconfig
+!ios/Runner/Secrets.xcconfig.example

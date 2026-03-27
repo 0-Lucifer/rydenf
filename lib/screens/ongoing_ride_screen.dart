@@ -5,6 +5,7 @@ import '../models/ride_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../widgets/rating_dialog.dart';
+import '../widgets/live_ride_map.dart';
 
 class OngoingRideScreen extends StatelessWidget {
   final String rideId;
@@ -43,6 +44,16 @@ class OngoingRideScreen extends StatelessWidget {
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     const SizedBox(height: 24),
+                    if (ride.hasCoordinates)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: LiveRideMap(
+                          ride: ride,
+                          isDriver: isDriver,
+                          height: 250,
+                        ),
+                      ),
+                    const SizedBox(height: 20),
                     _buildRouteProgress(ride),
                     const SizedBox(height: 20),
                     _buildPassengerList(ride),

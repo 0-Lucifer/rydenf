@@ -23,6 +23,18 @@ class Ride {
   final List<String> passengers; // accepted passenger UIDs
   final DateTime createdAt;
 
+  // GPS coordinates (nullable for backward compat with existing rides)
+  final double? originLat;
+  final double? originLng;
+  final double? destinationLat;
+  final double? destinationLng;
+  final double? distanceKm;
+  final int? durationMinutes;
+
+  // Live driver location (updated during in_progress rides)
+  final double? driverLat;
+  final double? driverLng;
+
   Ride({
     this.id,
     required this.driverId,
@@ -42,6 +54,14 @@ class Ride {
     this.instantMatch = false,
     this.status = 'active',
     this.passengers = const [],
+    this.originLat,
+    this.originLng,
+    this.destinationLat,
+    this.destinationLng,
+    this.distanceKm,
+    this.durationMinutes,
+    this.driverLat,
+    this.driverLng,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -66,6 +86,14 @@ class Ride {
       'status': status,
       'passengers': passengers,
       'createdAt': Timestamp.fromDate(createdAt),
+      if (originLat != null) 'originLat': originLat,
+      if (originLng != null) 'originLng': originLng,
+      if (destinationLat != null) 'destinationLat': destinationLat,
+      if (destinationLng != null) 'destinationLng': destinationLng,
+      if (distanceKm != null) 'distanceKm': distanceKm,
+      if (durationMinutes != null) 'durationMinutes': durationMinutes,
+      if (driverLat != null) 'driverLat': driverLat,
+      if (driverLng != null) 'driverLng': driverLng,
     };
   }
 
@@ -90,6 +118,14 @@ class Ride {
       instantMatch: map['instantMatch'] ?? false,
       status: map['status'] ?? 'active',
       passengers: List<String>.from(map['passengers'] ?? []),
+      originLat: (map['originLat'] as num?)?.toDouble(),
+      originLng: (map['originLng'] as num?)?.toDouble(),
+      destinationLat: (map['destinationLat'] as num?)?.toDouble(),
+      destinationLng: (map['destinationLng'] as num?)?.toDouble(),
+      distanceKm: (map['distanceKm'] as num?)?.toDouble(),
+      durationMinutes: map['durationMinutes'] as int?,
+      driverLat: (map['driverLat'] as num?)?.toDouble(),
+      driverLng: (map['driverLng'] as num?)?.toDouble(),
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
@@ -104,4 +140,8 @@ class Ride {
         return VehicleType.car;
     }
   }
+
+  /// Whether this ride has GPS coordinates.
+  bool get hasCoordinates =>
+      originLat != null && originLng != null && destinationLat != null && destinationLng != null;
 }
