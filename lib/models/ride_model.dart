@@ -30,6 +30,7 @@ class Ride {
   final double? destinationLng;
   final double? distanceKm;
   final int? durationMinutes;
+  final double? maxFare;
 
   // Live driver location (updated during in_progress rides)
   final double? driverLat;
@@ -60,6 +61,7 @@ class Ride {
     this.destinationLng,
     this.distanceKm,
     this.durationMinutes,
+    this.maxFare,
     this.driverLat,
     this.driverLng,
     DateTime? createdAt,
@@ -92,6 +94,7 @@ class Ride {
       if (destinationLng != null) 'destinationLng': destinationLng,
       if (distanceKm != null) 'distanceKm': distanceKm,
       if (durationMinutes != null) 'durationMinutes': durationMinutes,
+      if (maxFare != null) 'maxFare': maxFare,
       if (driverLat != null) 'driverLat': driverLat,
       if (driverLng != null) 'driverLng': driverLng,
     };
@@ -124,6 +127,7 @@ class Ride {
       destinationLng: (map['destinationLng'] as num?)?.toDouble(),
       distanceKm: (map['distanceKm'] as num?)?.toDouble(),
       durationMinutes: map['durationMinutes'] as int?,
+      maxFare: (map['maxFare'] as num?)?.toDouble(),
       driverLat: (map['driverLat'] as num?)?.toDouble(),
       driverLng: (map['driverLng'] as num?)?.toDouble(),
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),

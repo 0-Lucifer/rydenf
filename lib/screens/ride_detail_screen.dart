@@ -540,7 +540,41 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text("TOTAL COST", style: GoogleFonts.plusJakartaSans(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w800, letterSpacing: 1)),
-                Text("৳${ride.pricePerSeat.toInt()}", style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w900, color: kTextMain)),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text("৳${ride.pricePerSeat.toInt()}", style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w900, color: kTextMain)),
+                    if (ride.maxFare != null && ride.pricePerSeat < ride.maxFare!) ...[
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          "৳${ride.maxFare!.toInt()}",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: kTextSub,
+                            decoration: TextDecoration.lineThrough,
+                            decorationColor: kTextSub,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (ride.maxFare != null && ride.pricePerSeat < ride.maxFare!)
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: kSuccess.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      "Below Max",
+                      style: GoogleFonts.plusJakartaSans(fontSize: 9, fontWeight: FontWeight.w800, color: kSuccess),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(width: 32),

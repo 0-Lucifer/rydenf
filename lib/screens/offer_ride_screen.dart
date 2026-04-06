@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/ride_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/pricing_service.dart';
 import '../widgets/place_autocomplete_field.dart';
 import '../widgets/ride_map_preview.dart';
 
@@ -41,6 +42,8 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
   final List<double?> _lngs = [null, null];
   double? _distanceKm;
   int? _durationMinutes;
+  double? _maxFare;
+  String? _priceError;
 
   // Design Constants - Refined Palette
   final Color kPrimaryColor = const Color(0xFF4F46E5);
@@ -89,12 +92,54 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
     });
   }
 
+  void _recalculatePrice() {
+    if (_distanceKm != null && _distanceKm! > 0) {
+      final maxFare = PricingService.calculateMaxFare(
+        distanceKm: _distanceKm!,
+        vehicleType: _selectedVehicle,
+      );
+      setState(() {
+        _maxFare = maxFare;
+        _priceController.text = maxFare.toInt().toString();
+        _priceError = null;
+      });
+    } else {
+      setState(() {
+        _maxFare = null;
+        _priceError = null;
+      });
+    }
+  }
+
+  void _validatePrice() {
+    final price = double.tryParse(_priceController.text);
+    if (price == null) {
+      setState(() => _priceError = 'Enter a valid price');
+      return;
+    }
+    final ceiling = _maxFare ?? PricingService.fallbackMaxFare;
+    if (price < PricingService.minimumFare) {
+      setState(() => _priceError = 'Minimum fare is ৳${PricingService.minimumFare.toInt()}');
+    } else if (price > ceiling) {
+      setState(() => _priceError = 'Maximum fare is ৳${ceiling.toInt()}');
+    } else {
+      setState(() => _priceError = null);
+    }
+  }
+
   Future<void> _publishRide() async {
     final origin = _locations.first.text.trim();
     final destination = _locations.last.text.trim();
 
     if (origin.isEmpty || destination.isEmpty) {
       _showSnackBar('Please enter pickup and drop-off locations.', false);
+      return;
+    }
+
+    // Validate price before publishing
+    _validatePrice();
+    if (_priceError != null) {
+      _showSnackBar(_priceError!, false);
       return;
     }
 
@@ -151,6 +196,7 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
       destinationLng: _lngs.last,
       distanceKm: _distanceKm,
       durationMinutes: _durationMinutes,
+      maxFare: _maxFare,
     );
 
     final result = await FirestoreService.publishRide(ride);
@@ -247,6 +293,7 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
                               _distanceKm = info.distanceKm;
                               _durationMinutes = info.durationMinutes;
                             });
+                            _recalculatePrice();
                           },
                         ),
                       ],
@@ -634,27 +681,53 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
   }
 
   Widget _buildPriceField() {
-    return Container(
-      width: 110,
-      height: 44,
-      decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(12)),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          const Text("৳", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(width: 6),
-          Expanded(
-            child: TextField(
-              controller: _priceController,
-              keyboardType: TextInputType.number,
-              style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
-              decoration: const InputDecoration(border: InputBorder.none, isDense: true),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 110,
+          height: 44,
+          decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              const Text("৳", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  controller: _priceController,
+                  keyboardType: TextInputType.number,
+                  style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                  decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+                  onChanged: (_) => _validatePrice(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_priceError != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            _priceError!,
+            style: GoogleFonts.plusJakartaSans(fontSize: 10, fontWeight: FontWeight.w700, color: kAccentRed),
+          ),
+        ] else if (_maxFare != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            "Max ৳${_maxFare!.toInt()}",
+            style: GoogleFonts.plusJakartaSans(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+          ),
+        ] else ...[
+          const SizedBox(height: 6),
+          Text(
+            "৳50 – ৳250",
+            style: GoogleFonts.plusJakartaSans(fontSize: 10, fontWeight: FontWeight.w700, color: kTextSecondary),
           ),
         ],
-      ),
+      ],
     );
   }
+
 
   Widget _buildBottomAction() {
     return Container(
@@ -800,6 +873,7 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
     return GestureDetector(
       onTap: () {
         setState(() => _selectedVehicle = type);
+        _recalculatePrice();
         Navigator.pop(context);
       },
       child: Container(

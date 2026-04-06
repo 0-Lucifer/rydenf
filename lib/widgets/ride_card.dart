@@ -153,20 +153,64 @@ class RideCard extends StatelessWidget {
   }
 
   Widget _buildPriceBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        "৳${ride.pricePerSeat.toInt()}",
-        style: GoogleFonts.plusJakartaSans(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-          fontSize: 15,
+    final bool hasDiscount = ride.maxFare != null && ride.pricePerSeat < ride.maxFare!;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "৳${ride.pricePerSeat.toInt()}",
+                style: GoogleFonts.plusJakartaSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
+              ),
+              if (hasDiscount) ...[
+                const SizedBox(width: 6),
+                Text(
+                  "৳${ride.maxFare!.toInt()}",
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white38,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    decoration: TextDecoration.lineThrough,
+                    decorationColor: Colors.white38,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
-      ),
+        if (hasDiscount)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                "Discounted",
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF10B981),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
