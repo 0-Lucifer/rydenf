@@ -269,7 +269,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                     children: [
                       Text("Departure Point", style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 2),
-                      Text(ride.origin, style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.bold, color: kTextMain)),
+                      Text(ride.origin, style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.bold, color: kTextMain), maxLines: 2, overflow: TextOverflow.ellipsis),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -278,7 +278,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                     children: [
                       Text("Destination", style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 2),
-                      Text(ride.destination, style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.bold, color: kTextMain)),
+                      Text(ride.destination, style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.bold, color: kTextMain), maxLines: 2, overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ],
@@ -470,7 +470,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               onTap: () => showUserProfile(context, req.passengerId),
               child: Row(
                 children: [
-                  Text(req.passengerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Flexible(child: Text(req.passengerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis)),
                   const SizedBox(width: 4),
                   Icon(Icons.open_in_new_rounded, size: 10, color: kAccent.withOpacity(0.4)),
                 ],
@@ -511,7 +511,9 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
             children: [
               const Icon(Icons.location_on_rounded, size: 14, color: kAccent),
               const SizedBox(width: 12),
-              Text(stop, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600, color: kTextMain)),
+              Expanded(
+                child: Text(stop, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600, color: kTextMain), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
             ],
           ),
         )),

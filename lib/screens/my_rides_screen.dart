@@ -533,16 +533,21 @@ class _PremiumRideCard extends StatelessWidget {
   }
 
   Widget _infoItem(IconData icon, String text) => Row(
+    mainAxisSize: MainAxisSize.min,
     children: [
       Icon(icon, size: 15, color: _MyRidesScreenState.kSecondary),
       const SizedBox(width: 8),
-      Text(
-        text, 
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 13, fontWeight: FontWeight.w700, 
-          color: isDark ? Colors.white70 : _MyRidesScreenState.kPrimary.withOpacity(0.8),
+      Flexible(
+        child: Text(
+          text, 
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13, fontWeight: FontWeight.w700, 
+            color: isDark ? Colors.white70 : _MyRidesScreenState.kPrimary.withOpacity(0.8),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-      )
+      ),
     ],
   );
 

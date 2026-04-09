@@ -112,6 +112,8 @@ class _RydenHomeState extends State<RydenHome> {
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 );

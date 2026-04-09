@@ -173,12 +173,12 @@ class OngoingRideScreen extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 20),
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   _headerChip(Icons.people_rounded, "${ride.passengers.length} Passenger${ride.passengers.length != 1 ? 's' : ''}"),
-                  const SizedBox(width: 12),
                   _headerChip(Icons.access_time_rounded, DateFormat('hh:mm a').format(ride.departureTime)),
-                  const SizedBox(width: 12),
                   _headerChip(
                     ride.vehicleType == VehicleType.bike ? Icons.two_wheeler_rounded : Icons.directions_car_filled_rounded,
                     ride.vehicleModel,
@@ -435,9 +435,11 @@ class OngoingRideScreen extends StatelessWidget {
             fontSize: 13, fontWeight: FontWeight.w600, color: kTextSecondary,
           )),
           const Spacer(),
-          Text(value, style: GoogleFonts.plusJakartaSans(
-            fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary,
-          )),
+          Flexible(
+            child: Text(value, style: GoogleFonts.plusJakartaSans(
+              fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary,
+            ), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end),
+          ),
         ],
       ),
     );

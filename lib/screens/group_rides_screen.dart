@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../widgets/premium_pickers.dart';
-import '../widgets/place_autocomplete_field.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/group_ride_model.dart';
 import '../services/firestore_service.dart';
@@ -439,38 +438,18 @@ class _GroupRidesScreenState extends State<GroupRidesScreen> {
       ),
       child: Column(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Stack(
+            alignment: Alignment.centerRight,
             children: [
               Column(
                 children: [
-                  const SizedBox(height: 14),
-                  const Icon(Icons.my_location_rounded, size: 20, color: kPrimaryBlue),
-                  Container(width: 1.5, height: 24, margin: const EdgeInsets.symmetric(vertical: 4), color: kBorderColor),
-                  const Icon(Icons.location_on_rounded, size: 20, color: Color(0xFFEF4444)),
-                  const SizedBox(height: 14),
+                  _buildSearchInput(controller: _fromController, placeholder: "From (e.g. NSU Gate)", icon: Icons.my_location_rounded, iconColor: kPrimaryBlue),
+                  const Padding(padding: EdgeInsets.only(left: 44), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
+                  _buildSearchInput(controller: _toController, placeholder: "To (e.g. Banani)", icon: Icons.location_on_rounded, iconColor: const Color(0xFFEF4444)),
                 ],
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  children: [
-                    PlaceAutocompleteField(
-                      controller: _fromController,
-                      hintText: "From (e.g. NSU Gate)",
-                      markerColor: kPrimaryBlue,
-                    ),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    PlaceAutocompleteField(
-                      controller: _toController,
-                      hintText: "To (e.g. Banani)",
-                      markerColor: const Color(0xFFEF4444),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 20),
+              Positioned(
+                right: 0,
                 child: GestureDetector(
                   onTap: _swapLocations,
                   child: Container(
@@ -512,6 +491,26 @@ class _GroupRidesScreenState extends State<GroupRidesScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSearchInput({required TextEditingController controller, required String placeholder, required IconData icon, required Color iconColor}) {
+    return Row(
+      children: [
+        Icon(icon, color: iconColor, size: 20),
+        const SizedBox(width: 14),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: placeholder,
+              hintStyle: GoogleFonts.plusJakartaSans(color: const Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.w500),
+              border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(vertical: 20),
+            ),
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 15, color: kContentColor),
+          ),
+        ),
+      ],
     );
   }
 
