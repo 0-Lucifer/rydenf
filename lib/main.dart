@@ -26,13 +26,10 @@ Future<void> main() async {
 
   await LocalNotificationService.instance.init();
 
-  // ⚠️ ONE-TIME SEED 
-  //await seedAppConfig(minAppVersion: '1.0.0');
-  // ⚠️ END ONE-TIME SEED
-
   // Fire-and-forget stale data cleanup (runs in background)
-  FirestoreService.cleanupOldNotifications();
-  FirestoreService.cleanupOldRides();
+
+  FirestoreService.cleanupAllOldData();
+  // 24-hour expiry cleanup for active/ongoing data
   FirestoreService.cleanupExpiredGroupRides();
   FirestoreService.cleanupExpiredChats();
   FirestoreService.cleanupExpiredRides();

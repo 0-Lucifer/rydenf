@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
@@ -737,8 +738,16 @@ class FirestoreService {
         })
         .handleError((error) {
           print('[FirestoreService] getNotificationsStream error: $error');
-          return <AppNotification>[];
-        });
+        })
+        .transform(
+          StreamTransformer<List<AppNotification>, List<AppNotification>>.fromHandlers(
+            handleData: (data, sink) => sink.add(data),
+            handleError: (error, stackTrace, sink) {
+              print('[FirestoreService] getNotificationsStream caught: $error');
+              sink.add(<AppNotification>[]);
+            },
+          ),
+        );
   }
 
   /// Stream unread notification count — only fetches unread docs
@@ -1861,14 +1870,31 @@ class FirestoreService {
     }
   }
 
-  /// Cleanup old notifications (> 7 days) to prevent database bloat
+  // ==========================================
+  //  7-DAY GLOBAL CLEANUP
+  //  Deletes ALL old data regardless of user,
+  //  keeping the database lean.
+  // ==========================================
+
+  /// Master cleanup — call once on app start to purge all stale data (> 7 days)
+  static Future<void> cleanupAllOldData() async {
+    // Run all cleanups concurrently for speed
+    await Future.wait([
+      cleanupOldNotifications(),
+      cleanupOldRides(),
+      cleanupOldRideRequests(),
+      cleanupOldGroupRides(),
+      cleanupOldGroupRideRequests(),
+      cleanupOldChatRooms(),
+    ]);
+  }
+
+  /// Cleanup old notifications (> 7 days) for ALL users
   static Future<void> cleanupOldNotifications() async {
-    if (_uid == null) return;
     try {
       final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7)));
       final old = await _db
           .collection('notifications')
-          .where('userId', isEqualTo: _uid)
           .where('createdAt', isLessThan: cutoff)
           .limit(200)
           .get();
@@ -1882,21 +1908,20 @@ class FirestoreService {
     }
   }
 
-  /// Cleanup old completed/cancelled rides (> 7 days) and their requests
+  /// Cleanup old rides (> 7 days) regardless of status, plus their requests
   static Future<void> cleanupOldRides() async {
     try {
       final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7)));
       final old = await _db
           .collection('rides')
           .where('createdAt', isLessThan: cutoff)
-          .where('status', whereIn: ['completed', 'cancelled'])
           .limit(50)
           .get();
       if (old.docs.isEmpty) return;
 
       for (final doc in old.docs) {
         final ops = <void Function(WriteBatch)>[];
-        // Delete associated requests
+        // Delete associated ride requests
         final requests = await _db
             .collection('ride_requests')
             .where('rideId', isEqualTo: doc.id)
@@ -1911,6 +1936,90 @@ class FirestoreService {
       print('[FirestoreService] cleanupOldRides error: $e');
     }
   }
+
+  /// Cleanup orphaned ride requests (> 7 days) that aren't tied to any ride
+  static Future<void> cleanupOldRideRequests() async {
+    try {
+      final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7)));
+      final old = await _db
+          .collection('ride_requests')
+          .where('createdAt', isLessThan: cutoff)
+          .limit(200)
+          .get();
+      if (old.docs.isEmpty) return;
+      final ops = old.docs
+          .map((doc) => (WriteBatch b) => b.delete(doc.reference))
+          .toList();
+      await _commitInChunks(ops);
+    } catch (e) {
+      print('[FirestoreService] cleanupOldRideRequests error: $e');
+    }
+  }
+
+  /// Cleanup old group rides (> 7 days) regardless of status, plus their data
+  static Future<void> cleanupOldGroupRides() async {
+    try {
+      final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7)));
+      final old = await _db
+          .collection('group_rides')
+          .where('createdAt', isLessThan: cutoff)
+          .limit(20)
+          .get();
+      if (old.docs.isEmpty) return;
+
+      for (final doc in old.docs) {
+        await _dissolveGroupRideData(doc.id);
+      }
+    } catch (e) {
+      print('[FirestoreService] cleanupOldGroupRides error: $e');
+    }
+  }
+
+  /// Cleanup orphaned group ride requests (> 7 days)
+  static Future<void> cleanupOldGroupRideRequests() async {
+    try {
+      final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7)));
+      final old = await _db
+          .collection('group_ride_requests')
+          .where('createdAt', isLessThan: cutoff)
+          .limit(200)
+          .get();
+      if (old.docs.isEmpty) return;
+      final ops = old.docs
+          .map((doc) => (WriteBatch b) => b.delete(doc.reference))
+          .toList();
+      await _commitInChunks(ops);
+    } catch (e) {
+      print('[FirestoreService] cleanupOldGroupRideRequests error: $e');
+    }
+  }
+
+  /// Cleanup old chat rooms (> 7 days) and their messages
+  static Future<void> cleanupOldChatRooms() async {
+    try {
+      final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7)));
+      final old = await _db
+          .collection('chat_rooms')
+          .where('createdAt', isLessThan: cutoff)
+          .limit(20)
+          .get();
+      if (old.docs.isEmpty) return;
+
+      for (final doc in old.docs) {
+        final messages = await doc.reference.collection('messages').limit(500).get();
+        final ops = <void Function(WriteBatch)>[];
+        for (final msg in messages.docs) {
+          ops.add((b) => b.delete(msg.reference));
+        }
+        ops.add((b) => b.delete(doc.reference));
+        await _commitInChunks(ops);
+      }
+    } catch (e) {
+      print('[FirestoreService] cleanupOldChatRooms error: $e');
+    }
+  }
+
+
 }
 
 /// Helper class for profile caching

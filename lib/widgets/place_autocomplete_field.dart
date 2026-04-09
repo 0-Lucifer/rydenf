@@ -34,6 +34,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
   Timer? _debounce;
   bool _isLoading = false;
   bool _ignoreNextChange = false;
+  bool _placeSelected = false;
 
   @override
   void initState() {
@@ -54,6 +55,9 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
       _ignoreNextChange = false;
       return;
     }
+
+    // User is manually typing, so clear the selection flag
+    _placeSelected = false;
 
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), () {
@@ -151,6 +155,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
         final position = await LocationService.getCurrentPosition();
         if (position != null) {
           _ignoreNextChange = true;
+          _placeSelected = true;
           widget.controller.text = 'My Location';
           widget.onPlaceSelected?.call('My Location', position.latitude, position.longitude);
         }
@@ -195,7 +200,11 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
     _removeOverlay();
 
     _ignoreNextChange = true;
+    _placeSelected = true;
     widget.controller.text = prediction.description;
+
+    // Unfocus the text field so the keyboard goes away
+    FocusScope.of(context).unfocus();
 
     // Get lat/lng from place ID
     if (prediction.placeId.isNotEmpty) {
@@ -215,6 +224,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
     );
     if (result != null && mounted) {
       _ignoreNextChange = true;
+      _placeSelected = true;
       widget.controller.text = result.name;
       widget.onPlaceSelected?.call(result.name, result.lat, result.lng);
     }
@@ -285,7 +295,8 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
           ),
         ),
         onTap: () {
-          if (widget.controller.text.length >= 2) {
+          // Only re-show suggestions if user hasn't already selected a place
+          if (!_placeSelected && widget.controller.text.length >= 2) {
             _searchPlaces(widget.controller.text);
           }
         },

@@ -168,6 +168,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     FocusScope.of(context).unfocus();
     setState(() {
       _showSearchResults = false;
+      _searchResults = [];
       _searchController.text = prediction.description;
     });
 

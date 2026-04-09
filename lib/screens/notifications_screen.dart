@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui';
+import 'dart:async';
 import '../models/notification_model.dart';
 import '../services/firestore_service.dart';
 import 'ride_detail_screen.dart';
 import 'ongoing_ride_screen.dart';
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
   // --- Premium Design Tokens ---
   static const Color kPrimary = Color(0xFF2E7CF6); // Premium Blue
   static const Color kTextPrimary = Color(0xFF0F172A); // Slate 900
@@ -18,6 +24,26 @@ class NotificationsScreen extends StatelessWidget {
   static const Color kDanger = Color(0xFFEF4444); // Rose 500
   static const Color kWarning = Color(0xFFF59E0B); // Amber 500
   static const Color kBackground = Color(0xFFF8FAFC); // Slate 50
+
+  late final Stream<List<AppNotification>> _notificationsStream;
+  bool _timedOut = false;
+  Timer? _timeoutTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationsStream = FirestoreService.getNotificationsStream();
+    // Safety timeout: if the stream hasn't emitted after 5 seconds, show empty
+    _timeoutTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _timedOut = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timeoutTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,12 +65,24 @@ class NotificationsScreen extends StatelessWidget {
               _buildPremiumSliverAppBar(context, isDark, horizontalPadding),
 
               StreamBuilder<List<AppNotification>>(
-                stream: FirestoreService.getNotificationsStream(),
+                stream: _notificationsStream,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  // Cancel timeout if we got data
+                  if (snapshot.hasData || snapshot.hasError) {
+                    _timeoutTimer?.cancel();
+                  }
+
+                  // Show loading only briefly, fall through to empty if timed out
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData && !_timedOut) {
                     return const SliverFillRemaining(
                       child: Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 3)),
                     );
+                  }
+
+                  // If there was an error, timed out, or no data — show empty state
+                  if (snapshot.hasError || _timedOut && !snapshot.hasData) {
+                    return SliverFillRemaining(child: _buildEmptyState(isDark));
                   }
 
                   final notifications = snapshot.data ?? [];
