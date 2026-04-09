@@ -26,8 +26,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void initState() {
     super.initState();
-    // Cleanup expired chats on screen load
-    FirestoreService.cleanupExpiredChats();
   }
 
   @override

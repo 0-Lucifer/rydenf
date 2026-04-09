@@ -31,10 +31,6 @@ class _MainWrapperState extends State<MainWrapper> {
   @override
   void initState() {
     super.initState();
-    // Cleanup expired data on app start
-    FirestoreService.cleanupExpiredChats();
-    FirestoreService.cleanupExpiredGroupRides();
-    FirestoreService.cleanupExpiredRides();
     // Start listening for push notifications
     LocalNotificationService.instance.startListening();
     // Check for forced app update (runs after first frame)

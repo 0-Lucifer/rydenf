@@ -121,6 +121,7 @@ class AuthService {
 
   // ─── Sign Out ────────────────────────────────────────
   static Future<void> signOut() async {
+    FirestoreService.clearStreamCaches();
     await _auth.signOut();
   }
 

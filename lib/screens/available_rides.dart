@@ -83,8 +83,11 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
 
                 return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(0, 10, 0, 30),
+                  cacheExtent: 500,
                   itemCount: filteredRides.length,
-                  itemBuilder: (context, index) => RideCard(ride: filteredRides[index]),
+                  itemBuilder: (context, index) => RepaintBoundary(
+                    child: RideCard(ride: filteredRides[index]),
+                  ),
                 );
               },
             ),

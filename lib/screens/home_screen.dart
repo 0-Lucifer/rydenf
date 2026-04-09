@@ -21,6 +21,13 @@ class RydenHome extends StatefulWidget {
 
 class _RydenHomeState extends State<RydenHome> {
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Precache hero image for instant rendering
+    precacheImage(const AssetImage('assets/images/home2.png'), context);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F9),
@@ -29,39 +36,41 @@ class _RydenHomeState extends State<RydenHome> {
         slivers: [
           // 1. THE TOP IMAGE HEADER
           SliverToBoxAdapter(
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  height: 280,
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    image: DecorationImage(
-                      image: AssetImage('assets/images/home2.png'),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.black.withOpacity(0.5),
-                          Colors.transparent,
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
+            child: RepaintBoundary(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    height: 280,
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      image: DecorationImage(
+                        image: AssetImage('assets/images/home2.png'),
+                        fit: BoxFit.cover,
                       ),
                     ),
-                    child: _buildTransparentHeader(),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withOpacity(0.5),
+                            Colors.transparent,
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      child: _buildTransparentHeader(),
+                    ),
                   ),
-                ),
-                Positioned(
-                  bottom: -30,
-                  left: 20,
-                  right: 20,
-                  child: _buildSearchBar(),
-                ),
-              ],
+                  Positioned(
+                    bottom: -30,
+                    left: 20,
+                    right: 20,
+                    child: _buildSearchBar(),
+                  ),
+                ],
+              ),
             ),
           ),
 

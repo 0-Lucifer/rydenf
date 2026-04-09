@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'firebase_options.dart';
 import 'services/auth_gate.dart';
 import 'services/local_notification_service.dart';
@@ -26,13 +28,15 @@ Future<void> main() async {
 
   await LocalNotificationService.instance.init();
 
-  // Fire-and-forget stale data cleanup (runs in background)
+  // Prefetch the primary font family so text renders instantly
+  GoogleFonts.config.allowRuntimeFetching = true;
+  GoogleFonts.plusJakartaSans();
 
+  // Fire-and-forget stale data cleanup once at startup
   FirestoreService.cleanupAllOldData();
-  // 24-hour expiry cleanup for active/ongoing data
-  FirestoreService.cleanupExpiredGroupRides();
-  FirestoreService.cleanupExpiredChats();
-  FirestoreService.cleanupExpiredRides();
+
+  // Lock orientation for consistent UX
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   runApp(const RydenApp());
 }
@@ -45,9 +49,16 @@ class RydenApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        fontFamily: 'Inter',
+        fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
         useMaterial3: true,
         appBarTheme: const AppBarTheme(elevation: 0, backgroundColor: Colors.transparent),
+        // Faster page transitions
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          },
+        ),
       ),
       home: const AuthGate(),
     );

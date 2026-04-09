@@ -22,6 +22,25 @@ class FirestoreService {
   static const _profileCacheTTL = Duration(minutes: 5);
   static void clearProfileCache() => _profileCache.clear();
 
+  // Stream caching — avoids creating duplicate Firestore listeners
+  static Stream<int>? _unreadNotifStream;
+  static Stream<int>? _unreadChatStream;
+  static Stream<UserProfile?>? _userProfileStream;
+  static String? _cachedProfileUid;
+  static String? _cachedNotifUid;
+  static String? _cachedChatUid;
+
+  /// Call on logout to clear all cached streams
+  static void clearStreamCaches() {
+    _unreadNotifStream = null;
+    _unreadChatStream = null;
+    _userProfileStream = null;
+    _cachedProfileUid = null;
+    _cachedNotifUid = null;
+    _cachedChatUid = null;
+    _profileCache.clear();
+  }
+
   // Helper to split big writes into batches under 500 ops
   static Future<void> _commitInChunks(List<void Function(WriteBatch)> ops) async {
     const maxOps = 450; // leave headroom below Firestore's 500 limit
@@ -87,13 +106,19 @@ class FirestoreService {
 
   static Stream<UserProfile?> getUserProfileStream() {
     if (_uid == null) return Stream.value(null);
-    return _db.collection('users').doc(_uid).snapshots().map((doc) {
+    // Return cached stream if user hasn't changed
+    if (_userProfileStream != null && _cachedProfileUid == _uid) {
+      return _userProfileStream!;
+    }
+    _cachedProfileUid = _uid;
+    _userProfileStream = _db.collection('users').doc(_uid).snapshots().map((doc) {
       if (!doc.exists || doc.data() == null) return null;
       return UserProfile.fromMap(doc.data()!);
     }).handleError((error) {
       print('[FirestoreService] getUserProfileStream error: $error');
       return null;
-    });
+    }).asBroadcastStream();
+    return _userProfileStream!;
   }
 
   static Future<UserProfile?> getUserProfile(String uid) async {
@@ -750,10 +775,14 @@ class FirestoreService {
         );
   }
 
-  /// Stream unread notification count — only fetches unread docs
+  /// Stream unread notification count — cached broadcast stream
   static Stream<int> getUnreadNotificationCount() {
     if (_uid == null) return Stream.value(0);
-    return _db
+    if (_unreadNotifStream != null && _cachedNotifUid == _uid) {
+      return _unreadNotifStream!;
+    }
+    _cachedNotifUid = _uid;
+    _unreadNotifStream = _db
         .collection('notifications')
         .where('userId', isEqualTo: _uid)
         .where('isRead', isEqualTo: false)
@@ -762,7 +791,9 @@ class FirestoreService {
         .handleError((error) {
           print('[FirestoreService] getUnreadCount error: $error');
           return 0;
-        });
+        })
+        .asBroadcastStream();
+    return _unreadNotifStream!;
   }
 
   /// Mark a single notification as read
@@ -1814,9 +1845,14 @@ class FirestoreService {
   }
 
   /// Get count of unread chat rooms
+  /// Unread chat count — cached broadcast stream
   static Stream<int> getUnreadChatCount() {
     if (_uid == null) return Stream.value(0);
-    return _db
+    if (_unreadChatStream != null && _cachedChatUid == _uid) {
+      return _unreadChatStream!;
+    }
+    _cachedChatUid = _uid;
+    _unreadChatStream = _db
         .collection('chat_rooms')
         .where('participants', arrayContains: _uid)
         .snapshots()
@@ -1843,7 +1879,9 @@ class FirestoreService {
         .handleError((error) {
           print('[FirestoreService] getUnreadChatCount error: $error');
           return 0;
-        });
+        })
+        .asBroadcastStream();
+    return _unreadChatStream!;
   }
 
   /// Delete expired chat rooms — limited to 20 per run to avoid heavy startup

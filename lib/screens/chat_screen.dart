@@ -329,6 +329,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   reverse: true,
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   physics: const BouncingScrollPhysics(),
+                  cacheExtent: 500,
                   itemCount: allMessages.length,
                   itemBuilder: (context, index) {
                     // Reverse index since ListView is reversed
@@ -346,15 +347,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       if (msg.createdAt.day != prev.createdAt.day) showDate = true;
                     }
 
-                    return Column(
-                      children: [
-                        if (showDate) _buildDateSeparator(msg.createdAt),
-                        _MessageBubble(
-                          message: msg,
-                          isMe: isMe,
-                          showSenderName: showName,
-                        ),
-                      ],
+                    return RepaintBoundary(
+                      child: Column(
+                        children: [
+                          if (showDate) _buildDateSeparator(msg.createdAt),
+                          _MessageBubble(
+                            message: msg,
+                            isMe: isMe,
+                            showSenderName: showName,
+                          ),
+                        ],
+                      ),
                     );
                   },
                 );
