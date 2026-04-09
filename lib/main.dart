@@ -6,7 +6,7 @@ import 'firebase_options.dart';
 import 'services/auth_gate.dart';
 import 'services/local_notification_service.dart';
 import 'services/firestore_service.dart';
-import 'scripts/seed_app_config.dart';
+// import 'scripts/seed_app_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

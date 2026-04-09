@@ -37,7 +37,7 @@ class _RydenHomeState extends State<RydenHome> {
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
-                      image: AssetImage('assets/images/home-pic.png'),
+                      image: AssetImage('assets/images/home2.png'),
                       fit: BoxFit.cover,
                     ),
                   ),
