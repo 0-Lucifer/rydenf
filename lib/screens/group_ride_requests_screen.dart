@@ -39,14 +39,18 @@ class GroupRideRequestsScreen extends StatelessWidget {
               children: [
                 const Icon(Icons.radio_button_checked_rounded, size: 12, color: kPrimaryBlue),
                 const SizedBox(width: 6),
-                Text(ride.from, style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: kSecondaryText)),
+                Flexible(
+                  child: Text(ride.from, style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: kSecondaryText), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8),
                   child: Icon(Icons.arrow_forward_rounded, size: 14, color: kSecondaryText),
                 ),
                 const Icon(Icons.location_on_rounded, size: 12, color: Colors.redAccent),
                 const SizedBox(width: 4),
-                Text(ride.to, style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: kSecondaryText)),
+                Flexible(
+                  child: Text(ride.to, style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: kSecondaryText), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
               ],
             ),
           ),
@@ -188,9 +192,13 @@ class _RequestCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            request.passengerName.isNotEmpty ? request.passengerName : 'Unknown',
-                            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 15, color: kContentColor),
+                          Flexible(
+                            child: Text(
+                              request.passengerName.isNotEmpty ? request.passengerName : 'Unknown',
+                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 15, color: kContentColor),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           const SizedBox(width: 6),
                           Icon(Icons.open_in_new_rounded, size: 12, color: kPrimaryBlue.withOpacity(0.5)),

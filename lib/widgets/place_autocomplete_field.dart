@@ -66,6 +66,9 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
   }
 
   Future<void> _searchPlaces(String input) async {
+    // Don't search if a place is already selected
+    if (_placeSelected) return;
+
     if (input.trim().length < 2) {
       _removeOverlay();
       return;
@@ -91,40 +94,55 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
     _removeOverlay();
 
     _overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        width: _getFieldWidth(),
-        child: CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          offset: const Offset(0, 52),
-          child: Material(
-            elevation: 12,
-            shadowColor: Colors.black26,
-            borderRadius: BorderRadius.circular(16),
-            color: Colors.white,
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 260),
-              decoration: BoxDecoration(
+      builder: (context) => Stack(
+        children: [
+          // Full-screen tap barrier — dismisses overlay when tapping outside
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () {
+                _removeOverlay();
+                FocusScope.of(context).unfocus();
+              },
+              behavior: HitTestBehavior.translucent,
+            ),
+          ),
+          // The actual suggestion dropdown
+          Positioned(
+            width: _getFieldWidth(),
+            child: CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              offset: const Offset(0, 52),
+              child: Material(
+                elevation: 12,
+                shadowColor: Colors.black26,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: ListView(
-                  padding: EdgeInsets.zero,
-                  shrinkWrap: true,
-                  children: [
-                    // "Use my location" option
-                    _buildMyLocationTile(),
-                    if (_suggestions.isNotEmpty)
-                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    ..._suggestions.map(_buildSuggestionTile),
-                  ],
+                color: Colors.white,
+                child: Container(
+                  constraints: const BoxConstraints(maxHeight: 260),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      children: [
+                        // "Use my location" option
+                        _buildMyLocationTile(),
+                        if (_suggestions.isNotEmpty)
+                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        ..._suggestions.map(_buildSuggestionTile),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
 
@@ -151,11 +169,13 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
         ),
       ),
       onTap: () async {
+        _debounce?.cancel();
         _removeOverlay();
         final position = await LocationService.getCurrentPosition();
         if (position != null) {
           _ignoreNextChange = true;
           _placeSelected = true;
+          _suggestions = [];
           widget.controller.text = 'My Location';
           widget.onPlaceSelected?.call('My Location', position.latitude, position.longitude);
         }
@@ -197,10 +217,12 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
   }
 
   Future<void> _selectPrediction(PlacePrediction prediction) async {
+    _debounce?.cancel();
     _removeOverlay();
 
     _ignoreNextChange = true;
     _placeSelected = true;
+    _suggestions = [];
     widget.controller.text = prediction.description;
 
     // Unfocus the text field so the keyboard goes away
@@ -216,7 +238,9 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
   }
 
   Future<void> _openMapPicker() async {
+    _debounce?.cancel();
     _removeOverlay();
+    _suggestions = [];
     final result = await MapLocationPicker.pick(
       context,
       title: widget.hintText,

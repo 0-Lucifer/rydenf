@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../widgets/premium_pickers.dart';
 import '../widgets/place_autocomplete_field.dart';
+import '../widgets/ride_map_preview.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/group_ride_model.dart';
 import '../services/firestore_service.dart';
@@ -30,6 +31,8 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
 
   // Coordinate tracking
   double? _fromLat, _fromLng, _toLat, _toLng;
+  double? _distanceKm;
+  int? _durationMinutes;
 
   // Premium Theme Palette
   static const Color kPrimaryBlue = Color(0xFF2E7CF6);
@@ -171,6 +174,7 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
                   controller: _pageController,
                   onPageChanged: (i) => setState(() => _currentStep = i),
                   physics: const NeverScrollableScrollPhysics(),
+                  clipBehavior: Clip.none,
                   children: [
                     _buildRouteStep(isDark),
                     _buildTransportStep(isDark),
@@ -303,6 +307,24 @@ class _HostGroupRideScreenState extends State<HostGroupRideScreen> {
               ),
             ),
           ),
+          // Map preview with distance & ETA
+          if (_fromLat != null && _fromLng != null &&
+              _toLat != null && _toLng != null) ...[
+            const SizedBox(height: 20),
+            RideMapPreview(
+              originLat: _fromLat,
+              originLng: _fromLng,
+              destLat: _toLat,
+              destLng: _toLng,
+              height: 180,
+              onRouteCalculated: (info) {
+                setState(() {
+                  _distanceKm = info.distanceKm;
+                  _durationMinutes = info.durationMinutes;
+                });
+              },
+            ),
+          ],
         ],
       ),
     );
