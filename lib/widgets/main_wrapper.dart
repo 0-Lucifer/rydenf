@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../screens/home_screen.dart';
 import '../screens/profile_screen.dart';
@@ -9,6 +9,7 @@ import '../screens/chat_list_screen.dart';
 import '../services/firestore_service.dart';
 import '../services/local_notification_service.dart';
 import '../services/force_update_service.dart';
+import '../services/background_notification_service.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -17,7 +18,7 @@ class MainWrapper extends StatefulWidget {
   State<MainWrapper> createState() => _MainWrapperState();
 }
 
-class _MainWrapperState extends State<MainWrapper> {
+class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
@@ -31,12 +32,30 @@ class _MainWrapperState extends State<MainWrapper> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Start listening for push notifications
     LocalNotificationService.instance.startListening();
+    // Tell background service the app is in foreground
+    BackgroundNotificationService.notifyAppResumed();
     // Check for forced app update (runs after first frame)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ForceUpdateService.checkAndPrompt(context);
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      BackgroundNotificationService.notifyAppResumed();
+    } else if (state == AppLifecycleState.paused) {
+      BackgroundNotificationService.notifyAppPaused();
+    }
   }
 
   Future<bool> _onWillPop() async {
@@ -169,7 +188,7 @@ class _MainWrapperState extends State<MainWrapper> {
         ),
       ),
     );
-    if (shouldExit == true) exit(0);
+    if (shouldExit == true) SystemNavigator.pop();
     return false;
   }
 

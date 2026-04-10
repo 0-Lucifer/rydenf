@@ -1,12 +1,21 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+/// Top-level handler for background FCM messages (must be a top-level function)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // When app is terminated/background, the OS shows the notification automatically
+  // from the FCM payload's `notification` field. No manual show() needed here.
+  // This handler exists so Firebase knows we handle background messages.
+}
+
 /// Singleton service for local push notifications.
 /// Listens to Firestore `notifications` and `chat_rooms` for real-time phone alerts.
-/// Notifications appear as heads-up pop-ups (like SMS) on both Android and iOS.
+/// Also integrates Firebase Cloud Messaging for background/terminated push delivery.
 class LocalNotificationService {
   LocalNotificationService._();
   static final LocalNotificationService instance = LocalNotificationService._();
@@ -26,10 +35,11 @@ class LocalNotificationService {
   bool _notificationListenerReady = false;
   bool _chatListenerReady = false;
 
-  /// Initialize the plugin (call once in main.dart)
+  /// Initialize the plugin and FCM (call once in main.dart)
   Future<void> init() async {
     if (_initialized) return;
 
+    // ─── Local Notifications Setup ───
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -54,6 +64,72 @@ class LocalNotificationService {
     await _plugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
+
+    // ─── Firebase Cloud Messaging Setup ───
+    await _initFCM();
+  }
+
+  /// Initialize Firebase Cloud Messaging for background/terminated push
+  Future<void> _initFCM() async {
+    final messaging = FirebaseMessaging.instance;
+
+    // Request FCM permission (iOS requires explicit permission)
+    await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+
+    // Register background message handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Handle FCM messages when app is in FOREGROUND
+    // (background/terminated messages are auto-shown by OS from the notification payload)
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final notification = message.notification;
+      if (notification != null) {
+        show(
+          title: notification.title ?? '',
+          body: notification.body ?? '',
+          channelId: 'ryden_fcm',
+          channelName: 'Push Notifications',
+        );
+      }
+    });
+
+    // Save the FCM token to Firestore so Cloud Functions can target this device
+    await _saveFCMToken();
+
+    // Listen for token refresh (happens periodically)
+    messaging.onTokenRefresh.listen((newToken) {
+      _saveFCMTokenValue(newToken);
+    });
+  }
+
+  /// Save current FCM token to the user's Firestore profile
+  Future<void> _saveFCMToken() async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await _saveFCMTokenValue(token);
+      }
+    } catch (e) {
+      print('[LocalNotificationService] Failed to get FCM token: $e');
+    }
+  }
+
+  /// Write a specific FCM token value to Firestore
+  Future<void> _saveFCMTokenValue(String token) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'fcmToken': token,
+      });
+    } catch (e) {
+      print('[LocalNotificationService] Failed to save FCM token: $e');
+    }
   }
 
   /// Show a pop-up notification (heads-up, like SMS)
@@ -118,6 +194,9 @@ class LocalNotificationService {
     _chatListenerReady = false;
     _shownNotificationIds.clear();
     _lastNotifiedMessageTime.clear();
+
+    // Refresh FCM token on each login/app start
+    _saveFCMToken();
 
     // ─── Listener 1: General notifications (rides, groups, approvals) ───
     // Simple query: only filter by userId — avoids composite index requirement.

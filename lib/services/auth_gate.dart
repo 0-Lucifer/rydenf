@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/login_screen.dart';
 import '../screens/email_verification_screen.dart';
 import '../widgets/main_wrapper.dart';
+import 'auth_service.dart';
 import 'firestore_service.dart';
 
 class AuthGate extends StatefulWidget {
@@ -13,26 +15,50 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  // Track whether the stream has emitted a real value at least once.
-  // This prevents showing LoginScreen during the brief initial null
-  // emission that happens before Firebase restores the persisted session.
-  bool _initialAuthResolved = false;
+  // Whether we've finished the initial auth check
+  bool _resolved = false;
+  // The result of the initial check: was the user previously logged in locally?
+  bool _wasLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
-    // If there's already a persisted user, mark as resolved immediately
-    if (FirebaseAuth.instance.currentUser != null) {
-      _initialAuthResolved = true;
+    _checkLocalLogin();
+  }
+
+  Future<void> _checkLocalLogin() async {
+    final savedUid = await AuthService.getSavedLoginUid();
+    _wasLoggedIn = savedUid != null && savedUid.isNotEmpty;
+
+    if (_wasLoggedIn && FirebaseAuth.instance.currentUser == null) {
+      // User was logged in before but Firebase hasn't restored yet.
+      // Give Firebase extra time to restore the persisted session.
+      for (var i = 0; i < 10; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (FirebaseAuth.instance.currentUser != null) break;
+      }
+    }
+
+    if (mounted) {
+      setState(() => _resolved = true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Still checking local login state
+    if (!_resolved) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF2E7CF6)),
+        ),
+      );
+    }
+
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Still waiting for the very first emission
+        // Waiting for the stream's first emission
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(
@@ -41,34 +67,15 @@ class _AuthGateState extends State<AuthGate> {
           );
         }
 
-        // Once we get real data, mark as resolved
-        if (snapshot.hasData && snapshot.data != null) {
-          _initialAuthResolved = true;
-        }
+        final user = snapshot.data;
 
-        // If we haven't resolved yet and data is null, keep showing
-        // the loading spinner — the persisted session is still restoring.
-        if (!_initialAuthResolved && (snapshot.data == null)) {
-          // Give Firebase a moment; show splash instead of LoginScreen
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted && !_initialAuthResolved) {
-              setState(() => _initialAuthResolved = true);
-            }
-          });
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(color: Color(0xFF2E7CF6)),
-            ),
-          );
-        }
-
-        // Not logged in (genuinely)
-        if (!snapshot.hasData || snapshot.data == null) {
+        // Not logged in
+        if (user == null) {
           return const LoginScreen();
         }
 
         // Logged in but email NOT verified
-        if (!snapshot.data!.emailVerified) {
+        if (!user.emailVerified) {
           return const EmailVerificationScreen();
         }
 

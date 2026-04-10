@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'firebase_options.dart';
 import 'services/auth_gate.dart';
 import 'services/local_notification_service.dart';
+import 'services/background_notification_service.dart';
 import 'services/firestore_service.dart';
 // import 'scripts/seed_app_config.dart';
 
@@ -27,6 +28,9 @@ Future<void> main() async {
   );
 
   await LocalNotificationService.instance.init();
+
+  // Start background service to keep notifications alive when app is closed
+  await BackgroundNotificationService.initialize();
 
   // Prefetch the primary font family so text renders instantly
   GoogleFonts.config.allowRuntimeFetching = true;

@@ -25,17 +25,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   static const Color kWarning = Color(0xFFF59E0B); // Amber 500
   static const Color kBackground = Color(0xFFF8FAFC); // Slate 50
 
-  late final Stream<List<AppNotification>> _notificationsStream;
+  late Stream<List<AppNotification>> _notificationsStream;
   bool _timedOut = false;
   Timer? _timeoutTimer;
+  // Track if we've received at least one emission from the stream
+  bool _hasReceivedData = false;
 
   @override
   void initState() {
     super.initState();
+    _initStream();
+  }
+
+  void _initStream() {
+    _timedOut = false;
+    _hasReceivedData = false;
+    _timeoutTimer?.cancel();
     _notificationsStream = FirestoreService.getNotificationsStream();
-    // Safety timeout: if the stream hasn't emitted after 5 seconds, show empty
-    _timeoutTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted) setState(() => _timedOut = true);
+    // If no data comes within 4 seconds, show "No notifications"
+    _timeoutTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted && !_hasReceivedData) {
+        setState(() => _timedOut = true);
+      }
     });
   }
 
@@ -67,21 +78,26 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               StreamBuilder<List<AppNotification>>(
                 stream: _notificationsStream,
                 builder: (context, snapshot) {
-                  // Cancel timeout if we got data
+                  // Mark that we've received at least one emission
                   if (snapshot.hasData || snapshot.hasError) {
+                    _hasReceivedData = true;
                     _timeoutTimer?.cancel();
                   }
 
-                  // Show loading only briefly, fall through to empty if timed out
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      !snapshot.hasData && !_timedOut) {
+                  // Show loading only while waiting AND we haven't timed out
+                  if (!_hasReceivedData && !_timedOut) {
                     return const SliverFillRemaining(
                       child: Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 3)),
                     );
                   }
 
-                  // If there was an error, timed out, or no data — show empty state
-                  if (snapshot.hasError || _timedOut && !snapshot.hasData) {
+                  // Timed out with no data — show empty state
+                  if (_timedOut && !_hasReceivedData) {
+                    return SliverFillRemaining(child: _buildEmptyState(isDark));
+                  }
+
+                  // Stream had an error
+                  if (snapshot.hasError) {
                     return SliverFillRemaining(child: _buildEmptyState(isDark));
                   }
 
@@ -245,7 +261,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
           const SizedBox(height: 32),
           Text(
-            "All caught up!",
+            "No notifications",
             style: GoogleFonts.plusJakartaSans(
               fontSize: 24, fontWeight: FontWeight.w900, color: isDark ? Colors.white : kTextPrimary,
               letterSpacing: -0.5,

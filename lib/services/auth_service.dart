@@ -1,8 +1,30 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firestore_service.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Local persistence keys
+  static const String _loginUidKey = 'ryden_logged_in_uid';
+
+  /// Save login state to device so it survives app kills
+  static Future<void> _saveLoginLocally(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_loginUidKey, uid);
+  }
+
+  /// Clear saved login state (called on logout)
+  static Future<void> _clearLocalLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_loginUidKey);
+  }
+
+  /// Check if user was previously logged in (for cold-start detection)
+  static Future<String?> getSavedLoginUid() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_loginUidKey);
+  }
 
   // ─── Domain Restriction ──────────────────────────────
   static const String _allowedDomain = 'northsouth.edu';
@@ -99,6 +121,11 @@ class AuthService {
         );
       }
 
+      // Persist login locally so it survives app kills
+      if (credential.user != null) {
+        await _saveLoginLocally(credential.user!.uid);
+      }
+
       return (
         success: true,
         message: 'Welcome back!',
@@ -122,6 +149,7 @@ class AuthService {
   // ─── Sign Out ────────────────────────────────────────
   static Future<void> signOut() async {
     FirestoreService.clearStreamCaches();
+    await _clearLocalLogin();
     await _auth.signOut();
   }
 
