@@ -33,7 +33,9 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
   List<PlacePrediction> _suggestions = [];
   Timer? _debounce;
   bool _isLoading = false;
-  bool _ignoreNextChange = false;
+  /// Stays true for the entire selection flow — suppresses ALL listener
+  /// firings until explicitly cleared (unlike the old single-shot flag).
+  bool _suppressSearch = false;
   bool _placeSelected = false;
 
   @override
@@ -51,10 +53,9 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
   }
 
   void _onTextChanged() {
-    if (_ignoreNextChange) {
-      _ignoreNextChange = false;
-      return;
-    }
+    // While a selection is being applied the controller fires multiple
+    // change events (clear → set new text). Ignore them all.
+    if (_suppressSearch) return;
 
     // User is manually typing, so clear the selection flag
     _placeSelected = false;
@@ -67,7 +68,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
 
   Future<void> _searchPlaces(String input) async {
     // Don't search if a place is already selected
-    if (_placeSelected) return;
+    if (_placeSelected || _suppressSearch) return;
 
     if (input.trim().length < 2) {
       _removeOverlay();
@@ -77,7 +78,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
     setState(() => _isLoading = true);
     final results = await PlacesService.getSuggestions(input);
 
-    if (mounted) {
+    if (mounted && !_suppressSearch) {
       setState(() {
         _suggestions = results;
         _isLoading = false;
@@ -87,6 +88,8 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
       } else {
         _removeOverlay();
       }
+    } else if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -171,14 +174,15 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
       onTap: () async {
         _debounce?.cancel();
         _removeOverlay();
+        _suppressSearch = true;
+        _placeSelected = true;
+        _suggestions = [];
         final position = await LocationService.getCurrentPosition();
-        if (position != null) {
-          _ignoreNextChange = true;
-          _placeSelected = true;
-          _suggestions = [];
+        if (position != null && mounted) {
           widget.controller.text = 'My Location';
           widget.onPlaceSelected?.call('My Location', position.latitude, position.longitude);
         }
+        // Keep suppression on — cleared only when user starts typing again
       },
     );
   }
@@ -220,7 +224,8 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
     _debounce?.cancel();
     _removeOverlay();
 
-    _ignoreNextChange = true;
+    // Suppress all listener events for the rest of this selection flow
+    _suppressSearch = true;
     _placeSelected = true;
     _suggestions = [];
     widget.controller.text = prediction.description;
@@ -240,6 +245,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
   Future<void> _openMapPicker() async {
     _debounce?.cancel();
     _removeOverlay();
+    _suppressSearch = true;
     _suggestions = [];
     final result = await MapLocationPicker.pick(
       context,
@@ -247,10 +253,12 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
       accentColor: widget.markerColor,
     );
     if (result != null && mounted) {
-      _ignoreNextChange = true;
       _placeSelected = true;
       widget.controller.text = result.name;
       widget.onPlaceSelected?.call(result.name, result.lat, result.lng);
+    } else {
+      // User cancelled—allow searching again
+      _suppressSearch = false;
     }
   }
 
@@ -301,6 +309,8 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
                 IconButton(
                   icon: Icon(Icons.clear_rounded, size: 18, color: Colors.grey.shade400),
                   onPressed: () {
+                    _suppressSearch = false;
+                    _placeSelected = false;
                     widget.controller.clear();
                     _removeOverlay();
                   },
@@ -320,7 +330,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
         ),
         onTap: () {
           // Only re-show suggestions if user hasn't already selected a place
-          if (!_placeSelected && widget.controller.text.length >= 2) {
+          if (!_placeSelected && !_suppressSearch && widget.controller.text.length >= 2) {
             _searchPlaces(widget.controller.text);
           }
         },
