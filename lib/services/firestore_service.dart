@@ -892,6 +892,17 @@ class FirestoreService {
     }
   }
 
+  /// Fetch a single group ride by ID
+  static Future<GroupRide?> getGroupRide(String groupRideId) async {
+    try {
+      final doc = await _db.collection('group_rides').doc(groupRideId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return GroupRide.fromMap(doc.data()!, doc.id);
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// Stream all active/full group rides, sorted newest first
   static Stream<List<GroupRide>> getAvailableGroupRidesStream() {
     return _db

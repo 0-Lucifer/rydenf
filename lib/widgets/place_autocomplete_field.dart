@@ -286,7 +286,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
         decoration: InputDecoration(
           hintText: widget.hintText,
           hintStyle: TextStyle(
-            color: Colors.grey.shade300,
+            color: Colors.grey.shade500,
             fontSize: 15,
             fontWeight: FontWeight.w500,
           ),

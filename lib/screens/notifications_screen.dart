@@ -7,6 +7,7 @@ import '../models/notification_model.dart';
 import '../services/firestore_service.dart';
 import 'ride_detail_screen.dart';
 import 'ongoing_ride_screen.dart';
+import 'group_ride_requests_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -475,22 +476,36 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (type.startsWith('group_ride_')) {
       if (type == 'group_ride_completed') {
         _showCompletedPopup(context, notification, isGroup: true);
-      } else {
-        // For group ride request/accepted/rejected/started: 
-        // Show a snackbar since the group ride screen uses a stream
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Check the Group Rides tab for details',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-            ),
-            backgroundColor: kPrimary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        return;
       }
+
+      // group_ride_request → navigate to join requests screen
+      if (type == 'group_ride_request' && rideId != null) {
+        try {
+          final groupRide = await FirestoreService.getGroupRide(rideId);
+          if (groupRide != null && context.mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => GroupRideRequestsScreen(ride: groupRide)),
+            );
+          }
+        } catch (_) {}
+        return;
+      }
+
+      // Other group ride notifications (accepted/rejected/started)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Check the Group Rides tab for details',
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+          ),
+          backgroundColor: kPrimary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
       return;
     }
 
