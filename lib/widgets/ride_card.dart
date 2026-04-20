@@ -2,18 +2,46 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/ride_model.dart';
+import '../models/user_model.dart';
+import '../services/firestore_service.dart';
 import '../screens/ride_detail_screen.dart';
 
-class RideCard extends StatelessWidget {
+class RideCard extends StatefulWidget {
   final Ride ride;
 
   const RideCard({super.key, required this.ride});
 
   @override
+  State<RideCard> createState() => _RideCardState();
+}
+
+class _RideCardState extends State<RideCard> {
+  double? _driverRating;
+  int _totalRatings = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDriverRating();
+  }
+
+  Future<void> _fetchDriverRating() async {
+    final profile = await FirestoreService.getUserProfile(widget.ride.driverId);
+    if (mounted && profile != null) {
+      setState(() {
+        _driverRating = profile.averageRating;
+        _totalRatings = profile.totalRatings;
+      });
+    }
+  }
+
+  Ride get ride => widget.ride;
+
+  @override
   Widget build(BuildContext context) {
     final String formattedDate = DateFormat('EEE, MMM dd').format(ride.departureTime);
     final String formattedTime = DateFormat('hh:mm a').format(ride.departureTime);
-    const Color kPrimaryBlue = Color(0xFF2E7CF6); // Login page blue
+    const Color kPrimaryBlue = Color(0xFF2E7CF6);
 
     return GestureDetector(
       onTap: () {
@@ -44,7 +72,7 @@ class RideCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start, // Align badge and text at the top
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildVehicleIcon(kPrimaryBlue),
                   const SizedBox(width: 14),
@@ -52,7 +80,7 @@ class RideCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 4), // Aligns title text baseline with badge baseline
+                        const SizedBox(height: 4),
                         Text(
                           ride.vehicleType == VehicleType.bike ? "Ryden Bike" : "Ryden Premium",
                           style: GoogleFonts.plusJakartaSans(
@@ -108,10 +136,16 @@ class RideCard extends StatelessWidget {
                         ),
                         Row(
                           children: [
-                            Icon(Icons.star_rounded, color: ride.rating != null ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8), size: 14),
+                            Icon(
+                              Icons.star_rounded,
+                              color: _totalRatings > 0 ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                              size: 14,
+                            ),
                             const SizedBox(width: 2),
                             Text(
-                              ride.rating ?? "No rating",
+                              _totalRatings > 0
+                                  ? "${_driverRating!.toStringAsFixed(1)} (${_totalRatings})"
+                                  : "No rating",
                               style: GoogleFonts.plusJakartaSans(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 12,

@@ -1598,6 +1598,35 @@ class FirestoreService {
     }
   }
 
+  /// Mark a rating as skipped so the dialog never shows again for this ride.
+  /// Writes a record with rating=0 that hasUserRated() will detect.
+  static Future<void> skipRating({
+    required String rideId,
+    required String ratedUserId,
+    required String rideType,
+  }) async {
+    if (_uid == null) return;
+    try {
+      // Only write if not already recorded
+      final already = await hasUserRated(rideId: rideId, ratedUserId: ratedUserId);
+      if (already) return;
+
+      await _db.collection('ratings').add({
+        'raterId': _uid,
+        'raterName': 'skipped',
+        'raterEmail': '',
+        'ratedUserId': ratedUserId,
+        'rating': 0,
+        'rideId': rideId,
+        'rideType': rideType,
+        'createdAt': Timestamp.now(),
+        'skipped': true,
+      });
+    } catch (e) {
+      print('[FirestoreService] skipRating error: $e');
+    }
+  }
+
   /// Fetch profiles for a list of user IDs (for rating dialogs)
   static Future<List<UserProfile>> getProfiles(List<String> uids) async {
     final profiles = <UserProfile>[];
@@ -1606,6 +1635,88 @@ class FirestoreService {
       if (p != null) profiles.add(p);
     }
     return profiles;
+  }
+
+  /// Check for any recently completed ride where the rider hasn't rated the host yet.
+  /// Only riders/passengers rate — hosts just complete the ride.
+  /// Returns info needed to show the rating dialog, or null if nothing pending.
+  static Future<Map<String, dynamic>?> getPendingRatingInfo() async {
+    if (_uid == null) return null;
+    try {
+      final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+
+      // Check regular rides where user is a passenger
+      // Single-field query only (no compound index needed)
+      final passengerRides = await _db
+          .collection('rides')
+          .where('passengers', arrayContains: _uid)
+          .get();
+
+      for (final doc in passengerRides.docs) {
+        final data = doc.data();
+        // Filter client-side: must be completed and recent
+        if (data['status'] != 'completed') continue;
+        final completedAt = data['completedAt'];
+        if (completedAt == null) continue;
+        final completedTime = (completedAt as Timestamp).toDate();
+        if (completedTime.isBefore(cutoff)) continue;
+
+        final driverId = data['driverId'] as String;
+        final rated = await hasUserRated(rideId: doc.id, ratedUserId: driverId);
+        if (!rated) {
+          final profile = await getUserProfile(driverId);
+          if (profile != null) {
+            return {
+              'rideId': doc.id,
+              'rideType': 'ride',
+              'targetUser': profile,
+              'origin': data['origin'] ?? '',
+              'destination': data['destination'] ?? '',
+            };
+          }
+        }
+      }
+
+      // Check group rides where user is a passenger (not host)
+      // Single-field query only
+      final groupRides = await _db
+          .collection('group_rides')
+          .where('passengers', arrayContains: _uid)
+          .get();
+
+      for (final doc in groupRides.docs) {
+        final data = doc.data();
+        // Filter client-side: must be completed and recent
+        if (data['status'] != 'completed') continue;
+        final completedAt = data['completedAt'];
+        if (completedAt == null) continue;
+        final completedTime = (completedAt as Timestamp).toDate();
+        if (completedTime.isBefore(cutoff)) continue;
+
+        final hostId = data['hostId'] as String;
+        // Skip if user is the host
+        if (hostId == _uid) continue;
+
+        final rated = await hasUserRated(rideId: doc.id, ratedUserId: hostId);
+        if (!rated) {
+          final profile = await getUserProfile(hostId);
+          if (profile != null) {
+            return {
+              'rideId': doc.id,
+              'rideType': 'group_ride',
+              'targetUser': profile,
+              'origin': data['from'] ?? '',
+              'destination': data['to'] ?? '',
+            };
+          }
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print('[FirestoreService] getPendingRatingInfo error: $e');
+      return null;
+    }
   }
 
   // ==========================================

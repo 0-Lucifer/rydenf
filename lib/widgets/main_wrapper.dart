@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,10 +7,12 @@ import '../screens/profile_screen.dart';
 import '../screens/trips_screen.dart';
 import '../screens/track_ride_screen.dart';
 import '../screens/chat_list_screen.dart';
+import '../models/user_model.dart';
 import '../services/firestore_service.dart';
 import '../services/local_notification_service.dart';
 import '../services/force_update_service.dart';
 import '../services/background_notification_service.dart';
+import '../widgets/rating_dialog.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -20,6 +23,10 @@ class MainWrapper extends StatefulWidget {
 
 class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
   int _selectedIndex = 0;
+  bool _isCheckingRating = false;
+  StreamSubscription? _rideSub;
+  Map<String, String>? _lastRideInfo;
+  bool _initialized = false;
 
   final List<Widget> _pages = [
     const RydenHome(),
@@ -33,20 +40,75 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Start listening for push notifications
     LocalNotificationService.instance.startListening();
-    // Tell background service the app is in foreground
     BackgroundNotificationService.notifyAppResumed();
-    // Check for forced app update (runs after first frame)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ForceUpdateService.checkAndPrompt(context);
     });
+    // Watch the active ride — when it disappears, show rating for passengers
+    _rideSub = FirestoreService.getActiveRideInfo().listen(_onRideChanged);
   }
 
   @override
   void dispose() {
+    _rideSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// When the active ride card disappears → ride just ended.
+  /// If user was a passenger/rider, show the rating dialog once.
+  void _onRideChanged(Map<String, String>? info) {
+    if (!_initialized) {
+      // First emission: just store current state, don't trigger anything
+      _initialized = true;
+      _lastRideInfo = info;
+      return;
+    }
+
+    // Ride card just disappeared (was showing, now null = ride ended)
+    if (_lastRideInfo != null && info == null) {
+      final role = _lastRideInfo!['role'] ?? '';
+      if (role == 'Passenger' || role == 'Rider') {
+        _showRatingOnce();
+      }
+    }
+
+    _lastRideInfo = info;
+  }
+
+  /// Show the rating dialog exactly once for the just-completed ride.
+  Future<void> _showRatingOnce() async {
+    if (_isCheckingRating) return;
+    _isCheckingRating = true;
+
+    try {
+      final info = await FirestoreService.getPendingRatingInfo();
+      if (info != null && mounted) {
+        final targetUser = info['targetUser'] as UserProfile;
+        final rideId = info['rideId'] as String;
+        final rideType = info['rideType'] as String;
+
+        final rated = await showRatingDialog(
+          context,
+          targetUser: targetUser,
+          rideId: rideId,
+          rideType: rideType,
+        );
+
+        if (!rated) {
+          await FirestoreService.skipRating(
+            rideId: rideId,
+            ratedUserId: targetUser.uid,
+            rideType: rideType,
+          );
+        }
+      }
+    } catch (e) {
+      print('[MainWrapper] _showRatingOnce error: $e');
+    }
+
+    _isCheckingRating = false;
   }
 
   @override

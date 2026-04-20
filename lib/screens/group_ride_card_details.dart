@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/group_ride_model.dart';
 import '../services/firestore_service.dart';
 import '../widgets/profile_popup.dart';
-import '../widgets/rating_dialog.dart';
 import '../widgets/ride_map_preview.dart';
 import 'group_ride_requests_screen.dart';
 import 'chat_screen.dart';
@@ -44,16 +43,30 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
   String _requestStatus = 'none'; // 'none', 'pending', 'accepted', 'rejected'
   bool _isLoadingStatus = true;
 
+  double? _hostRating;
+  int _hostTotalRatings = 0;
+
   bool get _isHost =>
       FirebaseAuth.instance.currentUser?.uid == widget.ride.hostId;
 
   @override
   void initState() {
     super.initState();
+    _fetchHostRating();
     if (!_isHost) {
       _loadRequestStatus();
     } else {
       _isLoadingStatus = false;
+    }
+  }
+
+  void _fetchHostRating() async {
+    final profile = await FirestoreService.getUserProfile(widget.ride.hostId);
+    if (mounted && profile != null) {
+      setState(() {
+        _hostRating = profile.averageRating;
+        _hostTotalRatings = profile.totalRatings;
+      });
     }
   }
 
@@ -153,7 +166,7 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text('End Group Ride?', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
         content: Text(
-          'This will end the ride and dissolve the group. You can rate passengers first.',
+          'This will end the ride and dissolve the group.',
           style: GoogleFonts.plusJakartaSans(fontSize: 14, color: Colors.grey[600]),
         ),
         actions: [
@@ -165,20 +178,7 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
             onPressed: () async {
               Navigator.pop(ctx);
 
-              // Show rating dialogs for passengers before dissolution
-              if (widget.ride.passengers.isNotEmpty && mounted) {
-                final profiles = await FirestoreService.getProfiles(widget.ride.passengers);
-                if (mounted && profiles.isNotEmpty) {
-                  await showSequentialRatingDialogs(
-                    context,
-                    users: profiles,
-                    rideId: widget.ride.id!,
-                    rideType: 'group_ride',
-                  );
-                }
-              }
-
-              // Dissolve after rating
+              // Dissolve the group ride
               setState(() => _isRequesting = true);
               final result = await FirestoreService.completeGroupRide(widget.ride.id!);
               if (mounted) {
@@ -454,9 +454,9 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
                     ),
                     Row(
                       children: [
-                        Icon(Icons.star_rounded, size: 16, color: widget.ride.hostRating > 0 ? Colors.amber : Colors.grey),
+                        Icon(Icons.star_rounded, size: 16, color: _hostTotalRatings > 0 ? Colors.amber : Colors.grey),
                         Text(
-                          " ${widget.ride.hostRating > 0 ? widget.ride.hostRating.toStringAsFixed(1) : 'No rating'} • ${_isHost ? 'You' : 'Trusted Host'}",
+                          " ${_hostTotalRatings > 0 ? '${_hostRating!.toStringAsFixed(1)} ($_hostTotalRatings)' : 'No rating'} • ${_isHost ? 'You' : 'Trusted Host'}",
                           style: GoogleFonts.plusJakartaSans(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54, fontWeight: FontWeight.w600),
                         ),
                       ],

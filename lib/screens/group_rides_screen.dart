@@ -632,9 +632,35 @@ class _GroupRidesScreenState extends State<GroupRidesScreen> {
   }
 }
 
-class _PremiumRideCard extends StatelessWidget {
+class _PremiumRideCard extends StatefulWidget {
   final GroupRide ride;
   const _PremiumRideCard({required this.ride});
+
+  @override
+  State<_PremiumRideCard> createState() => _PremiumRideCardState();
+}
+
+class _PremiumRideCardState extends State<_PremiumRideCard> {
+  double? _hostRating;
+  int _hostTotalRatings = 0;
+
+  GroupRide get ride => widget.ride;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHostRating();
+  }
+
+  void _fetchHostRating() async {
+    final profile = await FirestoreService.getUserProfile(ride.hostId);
+    if (mounted && profile != null) {
+      setState(() {
+        _hostRating = profile.averageRating;
+        _hostTotalRatings = profile.totalRatings;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -689,9 +715,12 @@ class _PremiumRideCard extends StatelessWidget {
                     ]),
                     const SizedBox(height: 2),
                     Row(children: [
-                      const Icon(Icons.star_rounded, size: 16, color: Color(0xFFFBBF24)),
+                      Icon(Icons.star_rounded, size: 16, color: _hostTotalRatings > 0 ? const Color(0xFFFBBF24) : Colors.grey),
                       const SizedBox(width: 4),
-                      Text("${ride.hostRating}", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13, color: kSecondaryText)),
+                      Text(
+                        _hostTotalRatings > 0 ? "${_hostRating!.toStringAsFixed(1)} ($_hostTotalRatings)" : "No rating",
+                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13, color: kSecondaryText),
+                      ),
                       const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Icon(Icons.circle, size: 4, color: kSecondaryText)),
                       Icon(genderIcon, size: 14, color: kSecondaryText),
                       const SizedBox(width: 4),

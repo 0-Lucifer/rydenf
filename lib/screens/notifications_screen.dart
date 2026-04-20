@@ -152,60 +152,49 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ? Padding(
               padding: const EdgeInsets.only(left: 12),
               child: Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.06)
-                              : Colors.white.withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark ? Colors.white10 : Colors.white,
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 16,
-                          color: isDark ? Colors.white : kTextPrimary,
-                        ),
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.06)
+                          : Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? Colors.white10 : Colors.white,
                       ),
+                    ),
+                    child: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 16,
+                      color: isDark ? Colors.white : kTextPrimary,
                     ),
                   ),
                 ),
               ),
             )
           : null,
-      flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-          child: FlexibleSpaceBar(
-            centerTitle: false,
-            titlePadding: EdgeInsets.symmetric(
-              horizontal: canGoBack ? horizontalPadding + 36 : horizontalPadding,
-              vertical: 20,
-            ),
-            title: Text(
-              "Notifications",
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: isDark ? Colors.white : kTextPrimary,
-                letterSpacing: -1.2,
-              ),
-            ),
-            background: Container(
-              color: isDark ? const Color(0xFF020617).withOpacity(0.7) : Colors.white.withOpacity(0.75),
+      flexibleSpace: FlexibleSpaceBar(
+          centerTitle: false,
+          titlePadding: EdgeInsets.symmetric(
+            horizontal: canGoBack ? horizontalPadding + 36 : horizontalPadding,
+            vertical: 20,
+          ),
+          title: Text(
+            "Notifications",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : kTextPrimary,
+              letterSpacing: -1.2,
             ),
           ),
+          background: Container(
+            color: isDark ? const Color(0xFF020617).withOpacity(0.95) : kBackground,
+          ),
         ),
-      ),
       actions: [
         _buildMarkAllReadAction(isDark),
         SizedBox(width: horizontalPadding),

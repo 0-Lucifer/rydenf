@@ -7,22 +7,65 @@ import '../services/firestore_service.dart';
 import '../widgets/rating_dialog.dart';
 import '../widgets/live_ride_map.dart';
 
-class OngoingRideScreen extends StatelessWidget {
+class OngoingRideScreen extends StatefulWidget {
   final String rideId;
   const OngoingRideScreen({super.key, required this.rideId});
 
+  @override
+  State<OngoingRideScreen> createState() => _OngoingRideScreenState();
+}
+
+class _OngoingRideScreenState extends State<OngoingRideScreen> {
   static const Color kPrimary = Color(0xFF2E7CF6);
   static const Color kTextPrimary = Color(0xFF0F172A);
   static const Color kTextSecondary = Color(0xFF64748B);
   static const Color kGreen = Color(0xFF10B981);
   static const Color kRed = Color(0xFFEF4444);
 
+  String? _lastStatus;
+  bool _ratingShown = false;
+
+  /// Detect when ride transitions to completed and auto-show rating for passengers
+  void _onRideUpdated(Ride ride) {
+    final isDriver = ride.driverId == AuthService.currentUser?.uid;
+    final justCompleted = _lastStatus == 'in_progress' && ride.status == 'completed';
+    _lastStatus = ride.status;
+
+    if (justCompleted && !isDriver && !_ratingShown) {
+      _ratingShown = true;
+      // Show rating immediately after the frame renders
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _autoShowRating(ride);
+      });
+    }
+  }
+
+  void _autoShowRating(Ride ride) async {
+    final driverProfile = await FirestoreService.getUserProfile(ride.driverId);
+    if (driverProfile != null && mounted) {
+      final rated = await showRatingDialog(
+        context,
+        targetUser: driverProfile,
+        rideId: ride.id!,
+        rideType: 'ride',
+      );
+      if (!rated) {
+        await FirestoreService.skipRating(
+          rideId: ride.id!,
+          ratedUserId: ride.driverId,
+          rideType: 'ride',
+        );
+      }
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: StreamBuilder<Ride?>(
-        stream: FirestoreService.getRideStream(rideId),
+        stream: FirestoreService.getRideStream(widget.rideId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: kPrimary));
@@ -31,6 +74,9 @@ class OngoingRideScreen extends StatelessWidget {
           if (ride == null) {
             return const Center(child: Text("Ride not found"));
           }
+
+          // Track status transitions for auto-rating
+          _onRideUpdated(ride);
 
           final isDriver = ride.driverId == AuthService.currentUser?.uid;
           final isCompleted = ride.status == 'completed';
@@ -68,7 +114,7 @@ class OngoingRideScreen extends StatelessWidget {
         },
       ),
       bottomNavigationBar: StreamBuilder<Ride?>(
-        stream: FirestoreService.getRideStream(rideId),
+        stream: FirestoreService.getRideStream(widget.rideId),
         builder: (context, snapshot) {
           final ride = snapshot.data;
           if (ride == null) return const SizedBox.shrink();
@@ -462,12 +508,18 @@ class OngoingRideScreen extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () => _showRatingAndPop(context, ride),
-                icon: const Icon(Icons.star_rounded, color: Colors.white),
-                label: Text("Rate & Done", style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white,
-                )),
+                icon: Icon(
+                  isDriver ? Icons.check_circle_rounded : Icons.star_rounded,
+                  color: Colors.white,
+                ),
+                label: Text(
+                  isDriver ? "Done" : "Rate & Done",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF59E0B),
+                  backgroundColor: isDriver ? kGreen : const Color(0xFFF59E0B),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 0,
                 ),
@@ -516,7 +568,7 @@ class OngoingRideScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text("Complete Ride?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
         content: Text(
-          "Mark this ride as completed. You'll be able to rate passengers next.",
+          "Mark this ride as completed for all passengers.",
           style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 14),
         ),
         actions: [
@@ -550,31 +602,29 @@ class OngoingRideScreen extends StatelessWidget {
     );
   }
 
-  /// Show rating dialog(s) then navigate back
+  /// Driver: just navigate back. Passenger: rate the driver then go back.
   void _showRatingAndPop(BuildContext context, Ride ride) async {
     final isDriver = ride.driverId == AuthService.currentUser?.uid;
 
     if (isDriver) {
-      // Driver rates each passenger
-      if (ride.passengers.isNotEmpty) {
-        final profiles = await FirestoreService.getProfiles(ride.passengers);
-        if (context.mounted) {
-          await showSequentialRatingDialogs(
-            context,
-            users: profiles,
-            rideId: ride.id!,
-            rideType: 'ride',
-          );
-        }
-      }
-    } else {
-      // Passenger rates the driver
-      final driverProfile = await FirestoreService.getUserProfile(ride.driverId);
-      if (driverProfile != null && context.mounted) {
-        await showRatingDialog(
-          context,
-          targetUser: driverProfile,
+      // Driver doesn't rate — just go back
+      if (context.mounted) Navigator.pop(context);
+      return;
+    }
+
+    // Passenger rates the driver
+    final driverProfile = await FirestoreService.getUserProfile(ride.driverId);
+    if (driverProfile != null && context.mounted) {
+      final rated = await showRatingDialog(
+        context,
+        targetUser: driverProfile,
+        rideId: ride.id!,
+        rideType: 'ride',
+      );
+      if (!rated) {
+        await FirestoreService.skipRating(
           rideId: ride.id!,
+          ratedUserId: ride.driverId,
           rideType: 'ride',
         );
       }

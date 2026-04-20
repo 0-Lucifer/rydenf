@@ -167,7 +167,20 @@ class _RydenHomeState extends State<RydenHome> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const NotificationsScreen(),
+            transitionDuration: const Duration(milliseconds: 300),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
+            transitionsBuilder: (_, animation, __, child) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                child: child,
+              );
+            },
+          ),
         );
       },
       child: StreamBuilder<int>(

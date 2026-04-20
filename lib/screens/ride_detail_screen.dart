@@ -35,10 +35,23 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   bool _isLoadingStatus = true;
   String? get _currentUid => AuthService.currentUser?.uid;
 
+  double? _driverRating;
+  int _driverTotalRatings = 0;
+
   @override
   void initState() {
     super.initState();
     _loadRequestStatus();
+  }
+
+  void _fetchDriverRating(String driverId) async {
+    final profile = await FirestoreService.getUserProfile(driverId);
+    if (mounted && profile != null) {
+      setState(() {
+        _driverRating = profile.averageRating;
+        _driverTotalRatings = profile.totalRatings;
+      });
+    }
   }
 
   void _loadRequestStatus() async {
@@ -327,7 +340,12 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
 
   Widget _buildHostSection(Ride ride) {
     final isDriver = ride.driverId == _currentUid;
-    final hasRating = ride.rating != null && ride.rating!.isNotEmpty;
+    final hasRating = _driverTotalRatings > 0;
+
+    // Trigger fetch if not yet loaded
+    if (_driverRating == null && _driverTotalRatings == 0) {
+      _fetchDriverRating(ride.driverId);
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -369,7 +387,10 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                           Icon(Icons.star_rounded, size: 14, color: hasRating ? Colors.amber : Colors.grey),
                           const SizedBox(width: 4),
                           Flexible(
-                            child: Text(hasRating ? ride.rating! : "No rating", style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: kTextMain)),
+                            child: Text(
+                              hasRating ? "${_driverRating!.toStringAsFixed(1)} ($_driverTotalRatings)" : "No rating",
+                              style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: kTextMain),
+                            ),
                           ),
                           const SizedBox(width: 8),
                           Text("Verified Host", style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: kSuccess)),
