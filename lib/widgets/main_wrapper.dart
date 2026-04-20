@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../screens/home_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/trips_screen.dart';
-import '../screens/notifications_screen.dart';
+import '../screens/track_ride_screen.dart';
 import '../screens/chat_list_screen.dart';
 import '../services/firestore_service.dart';
 import '../services/local_notification_service.dart';
@@ -25,7 +25,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
     const RydenHome(),
     const TripsScreen(),
     const ChatListScreen(),
-    const NotificationsScreen(),
+    const TrackRideScreen(),
     const ProfileScreen(),
   ];
 
@@ -248,7 +248,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
                 _navItem(0, Icons.grid_view_rounded, "Explore"),
                 _navItem(1, Icons.local_taxi_rounded, "Trips"),
                 _navItemWithBadge(2, Icons.chat_bubble_rounded, "Chat", isChatBadge: true),
-                _navItemWithBadge(3, Icons.notifications_rounded, "Alerts", isChatBadge: false),
+                _navItem(3, Icons.near_me_rounded, "Track"),
                 _navItem(4, Icons.person_rounded, "Account"),
               ],
             ),
