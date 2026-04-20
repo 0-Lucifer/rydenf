@@ -104,8 +104,11 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
         _priceError = null;
       });
     } else {
+      // No distance data yet — set a vehicle-specific default price
+      final defaultPrice = _selectedVehicle == VehicleType.bike ? '30' : '50';
       setState(() {
         _maxFare = null;
+        _priceController.text = defaultPrice;
         _priceError = null;
       });
     }
@@ -744,7 +747,7 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                _miniBtn(Icons.remove, () => _updateSeats(-1)),
+                _miniBtn(Icons.remove, () => _updateSeats(-1), disabled: _selectedVehicle == VehicleType.bike),
                 SizedBox(
                   width: 40, 
                   child: Center(
@@ -754,7 +757,7 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
                     )
                   )
                 ),
-                _miniBtn(Icons.add, () => _updateSeats(1)),
+                _miniBtn(Icons.add, () => _updateSeats(1), disabled: _selectedVehicle == VehicleType.bike),
               ],
             ),
           ),
@@ -783,23 +786,26 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
     );
   }
 
-  Widget _miniBtn(IconData icon, VoidCallback onTap) {
+  Widget _miniBtn(IconData icon, VoidCallback onTap, {bool disabled = false}) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white, 
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            )
-          ]
+      onTap: disabled ? null : onTap,
+      child: Opacity(
+        opacity: disabled ? 0.3 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white, 
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              )
+            ]
+          ),
+          child: Icon(icon, size: 18, color: kTextPrimary),
         ),
-        child: Icon(icon, size: 18, color: kTextPrimary),
       ),
     );
   }
@@ -819,8 +825,10 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
   }
 
   void _updateSeats(int d) {
+    // Bikes are always 1 seat
+    if (_selectedVehicle == VehicleType.bike) return;
     int n = _seatsAvailable + d;
-    if (n >= 1 && n <= 4) setState(() => _seatsAvailable = n);
+    if (n >= 1 && n <= 6) setState(() => _seatsAvailable = n);
   }
 
   String _getVehicleName(VehicleType t) => t == VehicleType.car ? "Car" : (t == VehicleType.bike ? "Bike" : "CNG");
@@ -872,9 +880,24 @@ class _OfferRideScreenState extends State<OfferRideScreen> {
     final isSelected = _selectedVehicle == type;
     return GestureDetector(
       onTap: () {
-        setState(() => _selectedVehicle = type);
-        _recalculatePrice();
         Navigator.pop(context);
+        // Run after the bottom sheet is fully dismissed so setState isn't lost
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          setState(() {
+            _selectedVehicle = type;
+            // Adjust seats based on vehicle type
+            if (type == VehicleType.bike) {
+              _seatsAvailable = 1;
+            } else if (_seatsAvailable < 1 || _seatsAvailable > 6) {
+              _seatsAvailable = 3;
+            }
+            // If switching from bike to car and seat is still 1, set default
+            if (type == VehicleType.car && _seatsAvailable == 1) {
+              _seatsAvailable = 3;
+            }
+          });
+          _recalculatePrice();
+        });
       },
       child: Container(
         padding: const EdgeInsets.all(16),

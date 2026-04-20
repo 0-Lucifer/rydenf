@@ -649,76 +649,123 @@ class FirestoreService {
         });
   }
 
-  /// Get any active in-progress ride for the current user (regular or group)
-  /// Returns a stream of ({String? rideId, String? type, String? from, String? to})
+  /// Get any active in-progress ride for the current user (regular or group).
+  /// Listens to all three sources in parallel so that changes in any one of
+  /// them (driver rides, passenger rides, group rides) trigger re-evaluation.
   static Stream<Map<String, String>?> getActiveRideInfo() {
     if (_uid == null) return Stream.value(null);
 
-    // Combine regular rides (as driver or passenger) and group rides
-    final regularAsDriver = _db
-        .collection('rides')
-        .where('driverId', isEqualTo: _uid)
-        .where('status', isEqualTo: 'in_progress')
-        .limit(1)
-        .snapshots();
+    late StreamController<Map<String, String>?> controller;
+    StreamSubscription? sub1, sub2, sub3;
 
-    final regularAsPassenger = _db
-        .collection('rides')
-        .where('passengers', arrayContains: _uid)
-        .snapshots();
+    QuerySnapshot<Map<String, dynamic>>? latestDriver;
+    QuerySnapshot<Map<String, dynamic>>? latestPassenger;
+    QuerySnapshot<Map<String, dynamic>>? latestGroup;
 
-    final groupRides = _db
-        .collection('group_rides')
-        .where('status', isEqualTo: 'in_progress')
-        .snapshots();
+    void evaluate() {
+      if (controller.isClosed) return;
 
-    // Merge all three streams
-    return regularAsDriver.asyncExpand((driverSnap) {
-      if (driverSnap.docs.isNotEmpty) {
-        final doc = driverSnap.docs.first;
+      // Priority 1: regular ride as driver
+      if (latestDriver != null && latestDriver!.docs.isNotEmpty) {
+        final doc = latestDriver!.docs.first;
         final data = doc.data();
-        return Stream.value({
+        controller.add({
           'rideId': doc.id,
           'type': 'ride',
           'from': data['origin'] ?? '',
           'to': data['destination'] ?? '',
           'role': 'Driver',
         });
+        return;
       }
-      return regularAsPassenger.asyncExpand((passengerSnap) {
-        final activeRide = passengerSnap.docs
-            .map((d) => MapEntry(d.id, d.data()))
-            .where((e) => e.value['status'] == 'in_progress')
-            .toList();
-        if (activeRide.isNotEmpty) {
-          final entry = activeRide.first;
-          return Stream.value({
-            'rideId': entry.key,
-            'type': 'ride',
-            'from': entry.value['origin'] ?? '',
-            'to': entry.value['destination'] ?? '',
-            'role': 'Passenger',
-          });
-        }
-        return groupRides.map((groupSnap) {
-          for (final doc in groupSnap.docs) {
-            final data = doc.data();
-            final hostId = data['hostId'] ?? '';
-            final passengers = List<String>.from(data['passengers'] ?? []);
-            if (hostId == _uid || passengers.contains(_uid)) {
-              return {
-                'rideId': doc.id,
-                'type': 'group_ride',
-                'from': data['from'] ?? '',
-                'to': data['to'] ?? '',
-                'role': hostId == _uid ? 'Host' : 'Rider',
-              };
-            }
+
+      // Priority 2: regular ride as passenger
+      if (latestPassenger != null) {
+        for (final doc in latestPassenger!.docs) {
+          final data = doc.data();
+          if (data['status'] == 'in_progress') {
+            controller.add({
+              'rideId': doc.id,
+              'type': 'ride',
+              'from': data['origin'] ?? '',
+              'to': data['destination'] ?? '',
+              'role': 'Passenger',
+            });
+            return;
           }
-          return null;
-        });
-      });
-    });
+        }
+      }
+
+      // Priority 3: group ride as host or rider
+      if (latestGroup != null) {
+        for (final doc in latestGroup!.docs) {
+          final data = doc.data();
+          final hostId = data['hostId'] ?? '';
+          final passengers = List<String>.from(data['passengers'] ?? []);
+          if (hostId == _uid || passengers.contains(_uid)) {
+            controller.add({
+              'rideId': doc.id,
+              'type': 'group_ride',
+              'from': data['from'] ?? '',
+              'to': data['to'] ?? '',
+              'role': hostId == _uid ? 'Host' : 'Rider',
+            });
+            return;
+          }
+        }
+      }
+
+      // Nothing active
+      controller.add(null);
+    }
+
+    void startListening() {
+      sub1 = _db
+          .collection('rides')
+          .where('driverId', isEqualTo: _uid)
+          .where('status', isEqualTo: 'in_progress')
+          .limit(1)
+          .snapshots()
+          .listen((snap) {
+        latestDriver = snap;
+        evaluate();
+      }, onError: (e) => print('[FirestoreService] getActiveRideInfo driver error: $e'));
+
+      sub2 = _db
+          .collection('rides')
+          .where('passengers', arrayContains: _uid)
+          .snapshots()
+          .listen((snap) {
+        latestPassenger = snap;
+        evaluate();
+      }, onError: (e) => print('[FirestoreService] getActiveRideInfo passenger error: $e'));
+
+      sub3 = _db
+          .collection('group_rides')
+          .where('status', isEqualTo: 'in_progress')
+          .snapshots()
+          .listen((snap) {
+        latestGroup = snap;
+        evaluate();
+      }, onError: (e) => print('[FirestoreService] getActiveRideInfo group error: $e'));
+    }
+
+    void stopListening() {
+      sub1?.cancel();
+      sub2?.cancel();
+      sub3?.cancel();
+      controller.close();
+    }
+
+    // Use a non-broadcast controller with onListen/onCancel so that
+    // Firestore subscriptions start only when the StreamBuilder subscribes,
+    // guaranteeing no events are lost.
+    controller = StreamController<Map<String, String>?>(
+      onListen: startListening,
+      onCancel: stopListening,
+    );
+
+    return controller.stream;
   }
 
   // ==========================================
