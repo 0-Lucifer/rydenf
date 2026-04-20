@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
@@ -373,23 +374,110 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
         _buildMenuTile(
-          Icons.security_rounded,
-          "Privacy Settings",
-          "Manage your data visibility",
-        ),
-        _buildMenuTile(
           Icons.info_rounded,
           "Support Center",
-          "Help and version information",
-          onTap: () {
-            showAboutDialog(
-              context: context,
-              applicationName: 'Ryden',
-              applicationVersion: '1.0.0',
-            );
-          },
+          "Help, complaints, and app info",
+          onTap: () => _showSupportSheet(),
         ),
       ],
+    );
+  }
+
+  void _showSupportSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 20),
+              Text("Support Center", style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: kTextPrimary)),
+              const SizedBox(height: 4),
+              Text("We're here to help", style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTextSecondary)),
+              const SizedBox(height: 24),
+              GestureDetector(
+                onTap: () {
+                  final uri = Uri(
+                    scheme: 'mailto',
+                    path: 'ahammed.jumma@northsouth.edu',
+                    queryParameters: {'subject': 'Ryden Support'},
+                  );
+                  launchUrl(uri);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: kPrimaryBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.mail_rounded, color: kPrimaryBlue, size: 28),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "For any support, complaints, or help",
+                        style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTextSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "ahammed.jumma@northsouth.edu",
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: kPrimaryBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showAboutDialog(
+                    context: context,
+                    applicationName: 'Ryden',
+                    applicationVersion: '1.0.0',
+                    applicationLegalese: '© 2026 Ryden. All rights reserved.',
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: kTextSecondary, size: 18),
+                      const SizedBox(width: 12),
+                      Text(
+                        "Ryden v1.0.0",
+                        style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: kTextSecondary),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: kTextSecondary),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

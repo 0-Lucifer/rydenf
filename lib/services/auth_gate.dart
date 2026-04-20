@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/login_screen.dart';
 import '../screens/email_verification_screen.dart';
+import '../screens/privacy_policy_screen.dart';
 import '../widgets/main_wrapper.dart';
 import 'auth_service.dart';
 import 'firestore_service.dart';
@@ -19,11 +20,31 @@ class _AuthGateState extends State<AuthGate> {
   bool _resolved = false;
   // The result of the initial check: was the user previously logged in locally?
   bool _wasLoggedIn = false;
+  // Whether the user has accepted the privacy policy
+  bool _privacyAccepted = false;
+  bool _privacyChecked = false;
 
   @override
   void initState() {
     super.initState();
-    _checkLocalLogin();
+    _checkPrivacyAndLogin();
+  }
+
+  Future<void> _checkPrivacyAndLogin() async {
+    // Check privacy policy acceptance first
+    final accepted = await PrivacyPolicyScreen.hasAccepted();
+    if (mounted) {
+      setState(() {
+        _privacyAccepted = accepted;
+        _privacyChecked = true;
+      });
+    }
+
+    // If privacy not accepted, stop here — show the policy screen
+    if (!accepted) return;
+
+    // Otherwise, proceed with the normal login check
+    await _checkLocalLogin();
   }
 
   Future<void> _checkLocalLogin() async {
@@ -44,8 +65,27 @@ class _AuthGateState extends State<AuthGate> {
     }
   }
 
+  void _onPrivacyAccepted() {
+    setState(() => _privacyAccepted = true);
+    _checkLocalLogin();
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Still checking privacy acceptance
+    if (!_privacyChecked) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF2E7CF6)),
+        ),
+      );
+    }
+
+    // Privacy policy not yet accepted — show it
+    if (!_privacyAccepted) {
+      return PrivacyPolicyScreen(onAccepted: _onPrivacyAccepted);
+    }
+
     // Still checking local login state
     if (!_resolved) {
       return const Scaffold(
