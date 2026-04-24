@@ -1,4 +1,4 @@
-package com.example.ryden
+package com.ryden.app
 
 import io.flutter.embedding.android.FlutterActivity
 

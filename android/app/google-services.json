@@ -1,24 +1,33 @@
 {
   "project_info": {
     "project_number": "318410227659",
+    "firebase_url": "https://ryden-2-default-rtdb.firebaseio.com",
     "project_id": "ryden-2",
     "storage_bucket": "ryden-2.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:318410227659:android:fe0e3ab21f97d2a820404e",
+        "mobilesdk_app_id": "1:318410227659:android:97f8e5f7e5c2126820404e",
         "android_client_info": {
-          "package_name": "com.example.ryden"
+          "package_name": "com.ryden.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "318410227659-s9i5gc73r1co4ebtb780u7sihslpdktp.apps.googleusercontent.com",
+          "client_id": "318410227659-upelaohl6n4fvs296jc6ves12jks3pd4.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.ryden",
-            "certificate_hash": "eabd9b1aa5e84fc0e36f30670dbef32def897fdc"
+            "package_name": "com.ryden.app",
+            "certificate_hash": "8573fb71e62d4f4f4a7c42f568b5fda4f7ac7775"
+          }
+        },
+        {
+          "client_id": "318410227659-vljsjekq77qhqd0n5iugnavfn99g3qq4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ryden.app",
+            "certificate_hash": "b82dfa148fe4d63d6accd521c7fab256d74affee"
           }
         },
         {

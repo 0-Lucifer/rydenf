@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>318410227659-3s25144qa9sfatpcv20cv8sgspdf6o52.apps.googleusercontent.com</string>
+	<string>318410227659-umqk5et1qbm5c9vofvol052365ngeapo.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.318410227659-3s25144qa9sfatpcv20cv8sgspdf6o52</string>
+	<string>com.googleusercontent.apps.318410227659-umqk5et1qbm5c9vofvol052365ngeapo</string>
 	<key>ANDROID_CLIENT_ID</key>
 	<string>318410227659-s9i5gc73r1co4ebtb780u7sihslpdktp.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
@@ -15,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.ryden</string>
+	<string>com.ryden.app</string>
 	<key>PROJECT_ID</key>
 	<string>ryden-2</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +31,8 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:318410227659:ios:61dba1c877bcc10120404e</string>
+	<string>1:318410227659:ios:65299ecad6a8802520404e</string>
+	<key>DATABASE_URL</key>
+	<string>https://ryden-2-default-rtdb.firebaseio.com</string>
 </dict>
 </plist>

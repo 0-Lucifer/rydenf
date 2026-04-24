@@ -66,7 +66,8 @@ class LocalNotificationService {
         ?.requestNotificationsPermission();
 
     // ─── Firebase Cloud Messaging Setup ───
-    await _initFCM();
+    // TODO: Uncomment when Firebase Blaze plan is active and FCM is configured
+    // await _initFCM();
   }
 
   /// Initialize Firebase Cloud Messaging for background/terminated push
@@ -196,7 +197,8 @@ class LocalNotificationService {
     _lastNotifiedMessageTime.clear();
 
     // Refresh FCM token on each login/app start
-    _saveFCMToken();
+    // TODO: Uncomment when Firebase Blaze plan is active and FCM is configured
+    // _saveFCMToken();
 
     // ─── Listener 1: General notifications (rides, groups, approvals) ───
     // Simple query: only filter by userId — avoids composite index requirement.
