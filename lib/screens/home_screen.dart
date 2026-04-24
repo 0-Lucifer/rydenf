@@ -41,7 +41,7 @@ class _RydenHomeState extends State<RydenHome> {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    height: 280,
+                    height: 310,
                     width: double.infinity,
                     decoration: const BoxDecoration(
                       image: DecorationImage(
@@ -64,7 +64,7 @@ class _RydenHomeState extends State<RydenHome> {
                     ),
                   ),
                   Positioned(
-                    bottom: -30,
+                    bottom: 0,
                     left: 20,
                     right: 20,
                     child: _buildSearchBar(),
@@ -76,13 +76,14 @@ class _RydenHomeState extends State<RydenHome> {
 
           // 2. THE CONTENT AREA
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(0, 40, 0, 100),
+            padding: const EdgeInsets.fromLTRB(0, 10, 0, 100),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _buildActiveRideBanner(),
                 _sectionHeader("Quick Actions", false),
                 _buildQuickActionsGrid(),
                 const SizedBox(height: 5),
+                _buildMyOfferedRides(),
                 _sectionHeader("Upcoming Rides", true),
                 _buildUpcomingRides(),
               ]),
@@ -222,39 +223,38 @@ class _RydenHomeState extends State<RydenHome> {
     );
   }
 
-  Widget _buildSearchBar() => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const AvailableRidesScreen()),
-      );
-    },
-    child: Container(
-      height: 60,
-      decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(color: const Color(0xFF2E7CF6).withOpacity(0.12), blurRadius: 25, offset: const Offset(0, 10))
-          ]
-      ),
-      child: Row(children: [
-        const SizedBox(width: 18),
-        const Icon(Icons.search_rounded, color: Color(0xFF2E7CF6), size: 26),
-        const SizedBox(width: 14),
-        const Expanded(
-          child: Text("Where are you heading?", style: TextStyle(color: Color(0xFF9BA5B0), fontSize: 15)),
-        ),
-        Container(
-          margin: const EdgeInsets.all(6),
-          decoration: BoxDecoration(color: const Color(0xFFF4F7F9), borderRadius: BorderRadius.circular(14)),
-          child: const Padding(
-            padding: EdgeInsets.all(10.0),
-            child: Icon(Icons.tune_rounded, color: Color(0xFF2E7CF6), size: 22),
+  Widget _buildSearchBar() => Material(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(20),
+    elevation: 8,
+    shadowColor: const Color(0xFF2E7CF6).withOpacity(0.12),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AvailableRidesScreen()),
+        );
+      },
+      child: SizedBox(
+        height: 60,
+        child: Row(children: [
+          const SizedBox(width: 18),
+          const Icon(Icons.search_rounded, color: Color(0xFF2E7CF6), size: 26),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Text("Where are you heading?", style: TextStyle(color: Color(0xFF9BA5B0), fontSize: 15)),
           ),
-        ),
-      ]),
+          Container(
+            margin: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: const Color(0xFFF4F7F9), borderRadius: BorderRadius.circular(14)),
+            child: const Padding(
+              padding: EdgeInsets.all(10.0),
+              child: Icon(Icons.tune_rounded, color: Color(0xFF2E7CF6), size: 22),
+            ),
+          ),
+        ]),
+      ),
     ),
   );
 
@@ -299,7 +299,30 @@ class _RydenHomeState extends State<RydenHome> {
     ]),
   );
 
+  Widget _buildMyOfferedRides() {
+    return StreamBuilder<List<Ride>>(
+      stream: FirestoreService.getUserRidesStream(),
+      builder: (context, snapshot) {
+        final allRides = snapshot.data ?? [];
+        final activeRides = allRides
+            .where((r) => r.status == 'active' || r.status == 'full')
+            .toList();
+        if (activeRides.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionHeader("My Offered Rides", false),
+            ...activeRides.map((ride) => RideCard(ride: ride)),
+            const SizedBox(height: 5),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildUpcomingRides() {
+    final currentUid = AuthService.currentUser?.uid;
     return StreamBuilder<List<Ride>>(
       stream: FirestoreService.getAvailableRidesStream(),
       builder: (context, snapshot) {
@@ -312,7 +335,10 @@ class _RydenHomeState extends State<RydenHome> {
           );
         }
 
-        final rides = snapshot.data ?? [];
+        // Filter out rides the current user created
+        final rides = (snapshot.data ?? [])
+            .where((r) => r.driverId != currentUid)
+            .toList();
 
         if (rides.isEmpty) {
           return Padding(

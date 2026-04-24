@@ -122,6 +122,192 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return 'Personal chat';
   }
 
+  void _showGroupMembers() {
+    final creatorId = widget.room.requesterId ?? widget.room.participants.first;
+    final isCreator = _myUid == creatorId;
+    final members = widget.room.participantNames.entries.toList();
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text('Group Members', style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16, fontWeight: FontWeight.w800, color: kDark,
+                )),
+                const SizedBox(height: 4),
+                Text('${members.length} members', style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12, color: kMuted,
+                )),
+                const SizedBox(height: 16),
+                ...members.map((e) {
+                  final uid = e.key;
+                  final name = e.value;
+                  final isAdmin = uid == creatorId;
+                  final isMe = uid == _myUid;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: isAdmin
+                              ? const Color(0xFF8B5CF6).withOpacity(0.12)
+                              : const Color(0xFFE2E8F0),
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : '?',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14, fontWeight: FontWeight.w800,
+                              color: isAdmin ? const Color(0xFF8B5CF6) : kMuted,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            isMe ? '$name (You)' : name,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14, fontWeight: FontWeight.w700, color: kDark,
+                            ),
+                          ),
+                        ),
+                        if (isAdmin)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text('Admin', style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF8B5CF6),
+                            )),
+                          ),
+                        // Kick button — only for admin, not for self
+                        if (isCreator && !isAdmin && !isMe)
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pop(sheetCtx);
+                              _confirmKick(uid, name);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEE2E2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.person_remove_rounded, size: 14, color: Color(0xFFEF4444)),
+                                  const SizedBox(width: 4),
+                                  Text('Remove', style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFEF4444),
+                                  )),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+                // Leave button for non-creators
+                if (!isCreator) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: TextButton(
+                      onPressed: () async {
+                        Navigator.pop(sheetCtx);
+                        if (widget.room.id != null) {
+                          final result = await FirestoreService.leaveChatRoom(widget.room.id!);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(result.message)),
+                            );
+                            if (result.success) Navigator.pop(context);
+                          }
+                        }
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFFEE2E2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: Text('Leave Group', style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFFEF4444),
+                      )),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmKick(String uid, String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Remove $name?', style: GoogleFonts.plusJakartaSans(
+          fontSize: 18, fontWeight: FontWeight.w800, color: kDark,
+        )),
+        content: Text(
+          'This member will be removed from the group and a seat will open up for new requests.',
+          style: GoogleFonts.plusJakartaSans(fontSize: 14, color: kMuted, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w700, color: kMuted,
+            )),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (widget.room.id != null) {
+                final result = await FirestoreService.kickMemberFromChatRoom(
+                  widget.room.id!, uid, name,
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(result.message),
+                      backgroundColor: result.success ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('Remove', style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w700, color: const Color(0xFFEF4444),
+            )),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final remaining = widget.room.expiresAt.difference(DateTime.now());
@@ -232,15 +418,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   if (widget.room.type == 'group')
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF8B5CF6).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${widget.room.participants.length}',
-                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w900, fontSize: 14, color: const Color(0xFF8B5CF6)),
+                    GestureDetector(
+                      onTap: _showGroupMembers,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${widget.room.participants.length}',
+                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w900, fontSize: 14, color: const Color(0xFF8B5CF6)),
+                            ),
+                            const SizedBox(width: 2),
+                            const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF8B5CF6)),
+                          ],
+                        ),
                       ),
                     ),
                   const SizedBox(width: 8),
@@ -513,6 +709,29 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // System messages (leave/kick notes)
+    if (message.senderId == 'system') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A).withOpacity(0.06),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              message.text,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12, fontWeight: FontWeight.w600,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final time = DateFormat('h:mm a').format(message.createdAt);
     final isSending = message.status == 'sending';
 

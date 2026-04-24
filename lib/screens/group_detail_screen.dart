@@ -457,9 +457,21 @@ class GroupDetailScreen extends StatelessWidget {
               child: SizedBox(
                 height: 52,
                 child: ElevatedButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
+                    // Build member names map
+                    final memberNames = <String, String>{};
+                    for (final uid in group.members) {
+                      final name = await _getMemberName(uid);
+                      memberNames[uid] = name;
+                    }
+                    if (!context.mounted) return;
                     Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => GroupChatScreen(groupId: groupId, groupName: group.name),
+                      builder: (_) => GroupChatScreen(
+                        groupId: groupId,
+                        groupName: group.name,
+                        creatorId: group.creatorId,
+                        memberNames: memberNames,
+                      ),
                     ));
                   },
                   icon: const Icon(Icons.chat_rounded, color: Colors.white, size: 20),

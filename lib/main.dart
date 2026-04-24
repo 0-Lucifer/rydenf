@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:geolocator/geolocator.dart';
 import 'firebase_options.dart';
 import 'services/auth_gate.dart';
 import 'services/local_notification_service.dart';
@@ -43,6 +45,33 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   runApp(const RydenApp());
+
+  // Request location permission AFTER first frame renders (non-blocking)
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _requestLocationPermission();
+  });
+}
+
+/// Request location permission at startup so the OS dialog appears early.
+Future<void> _requestLocationPermission() async {
+  try {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      debugPrint('[Main] Location services are disabled.');
+      return;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      debugPrint('[Main] Location permission permanently denied.');
+    }
+  } catch (e) {
+    debugPrint('[Main] Location permission request error: $e');
+  }
 }
 
 class RydenApp extends StatelessWidget {

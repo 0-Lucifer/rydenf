@@ -23,7 +23,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
 
     <application
-        android:label="ryden"
+        android:label="Ryden"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

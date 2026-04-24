@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -33,6 +34,10 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   bool _isRequesting = false;
   String _requestStatus = 'none'; // 'none', 'pending', 'accepted', 'rejected'
   bool _isLoadingStatus = true;
+
+  // 5-second cancel window after requesting
+  bool _cancelWindowActive = false;
+  Timer? _cancelTimer;
   String? get _currentUid => AuthService.currentUser?.uid;
 
   double? _driverRating;
@@ -42,6 +47,12 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   void initState() {
     super.initState();
     _loadRequestStatus();
+  }
+
+  @override
+  void dispose() {
+    _cancelTimer?.cancel();
+    super.dispose();
   }
 
   void _fetchDriverRating(String driverId) async {
@@ -458,7 +469,9 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         StreamBuilder<List<RideRequest>>(
           stream: FirestoreService.getRequestsForRide(widget.rideId),
           builder: (context, snapshot) {
-            final requests = snapshot.data ?? [];
+            final requests = (snapshot.data ?? [])
+                .where((r) => r.status == 'pending' || r.status == 'accepted')
+                .toList();
             if (requests.isEmpty) return _emptyRequests();
             return Column(children: requests.map((req) => _requestRow(req)).toList());
           },
@@ -629,7 +642,12 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     if (_isLoadingStatus) {
       return const SizedBox(height: 56, child: Center(child: CircularProgressIndicator(color: kAccent, strokeWidth: 2)));
     }
-    if (_requestStatus == 'pending') return _disabledTag("REQUESTED ⏳", const Color(0xFFF59E0B));
+    if (_requestStatus == 'pending') {
+      if (_cancelWindowActive) {
+        return _actionBtnLarge("CANCEL REQUEST", () => _showCancelRequestDialog(ride), kError);
+      }
+      return _disabledTag("REQUESTED ⏳", const Color(0xFFF59E0B));
+    }
     if (_requestStatus == 'accepted') return _disabledTag("ACCEPTED ✓", kSuccess);
 
     return _actionBtnLarge(_isRequesting ? "SENDING..." : (ride.instantMatch ? "BOOK NOW" : "REQUEST SEAT"), _isRequesting ? null : () => _handleRequest(ride), kAccent);
@@ -668,13 +686,22 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   Future<void> _handleRequest(Ride ride) async {
     setState(() => _isRequesting = true);
     final result = await FirestoreService.requestRide(rideId: ride.id!);
+    if (!mounted) return;
     setState(() {
       _isRequesting = false;
       if (result.success) {
         _requestStatus = ride.instantMatch ? 'accepted' : 'pending';
+        // Start 5-second cancel window for non-instant rides
+        if (!ride.instantMatch) {
+          _cancelWindowActive = true;
+          _cancelTimer?.cancel();
+          _cancelTimer = Timer(const Duration(seconds: 5), () {
+            if (mounted) setState(() => _cancelWindowActive = false);
+          });
+        }
       }
     });
-    if (mounted) _showSnack(result.message, result.success);
+    _showSnack(result.message, result.success);
   }
 
   Future<void> _handleAccept(String requestId) async {
@@ -693,11 +720,253 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   }
 
   void _showCancelRideDialog(Ride ride) {
-    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text("Cancel this trip?"), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("No")), ElevatedButton(onPressed: () { Navigator.pop(ctx); FirestoreService.cancelRide(ride.id!); }, child: const Text("Yes"))]));
+    showDialog(
+      context: context,
+      barrierColor: kTextMain.withOpacity(0.5),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: kSurface,
+        contentPadding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+        actionsPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFFEE2E2),
+                    const Color(0xFFFECACA).withOpacity(0.5),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 28),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Cancel this trip?',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: kTextMain,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'All pending requests will be rejected\nand passengers will be notified.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: kTextSub,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 28),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: Text(
+                        'Keep Trip',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: kTextSub,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFEF4444).withOpacity(0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          FirestoreService.cancelRide(ride.id!);
+                        },
+                        style: TextButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text(
+                          'Cancel Trip',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showCancelBookingDialog(Ride ride) {
     showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text("Cancel your booking?"), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("No")), ElevatedButton(onPressed: () async { Navigator.pop(ctx); final requests = await FirestoreService.getRequestsForRide(ride.id!).first; final myReq = requests.where((r) => r.passengerId == _currentUid && (r.status == 'accepted' || r.status == 'pending')).firstOrNull; if (myReq != null) FirestoreService.cancelBooking(myReq.id!); }, child: const Text("Cancel"))]));
+  }
+
+  void _showCancelRequestDialog(Ride ride) {
+    showDialog(
+      context: context,
+      barrierColor: kTextMain.withOpacity(0.5),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: kSurface,
+        contentPadding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+        actionsPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFFEE2E2),
+                    const Color(0xFFFECACA).withOpacity(0.5),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.undo_rounded, color: Color(0xFFEF4444), size: 28),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Withdraw Request?',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: kTextMain,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your seat request will be cancelled\nand the driver won\'t see it.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: kTextSub,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 28),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: Text(
+                        'Keep It',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: kTextSub,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFEF4444).withOpacity(0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _handleCancelRequest(ride);
+                        },
+                        style: TextButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text(
+                          'Withdraw',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleCancelRequest(Ride ride) async {
+    _cancelTimer?.cancel();
+    setState(() => _cancelWindowActive = false);
+    final result = await FirestoreService.cancelPendingRideRequest(ride.id!);
+    if (mounted) {
+      if (result.success) {
+        setState(() => _requestStatus = 'none');
+      }
+      _showSnack(result.message, result.success);
+    }
   }
 
   void _showSnack(String m, bool s) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), backgroundColor: s ? kSuccess : kError, behavior: SnackBarBehavior.floating, margin: const EdgeInsets.all(20)));

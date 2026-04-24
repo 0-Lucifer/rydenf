@@ -10,6 +10,8 @@ import '../models/group_ride_request_model.dart';
 import '../models/chat_room_model.dart';
 import '../models/chat_message_model.dart';
 import '../models/rating_model.dart';
+import '../models/group_model.dart';
+import '../models/group_message_model.dart';
 
 class FirestoreService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -155,6 +157,18 @@ class FirestoreService {
 
   static Future<({bool success, String message})> publishRide(Ride ride) async {
     try {
+      // Enforce 1 active ride per user
+      if (_uid != null) {
+        final existing = await _db
+            .collection('rides')
+            .where('driverId', isEqualTo: _uid)
+            .where('status', whereIn: ['active', 'full', 'in_progress'])
+            .limit(1)
+            .get();
+        if (existing.docs.isNotEmpty) {
+          return (success: false, message: 'You already have an active ride. Cancel or complete it first.');
+        }
+      }
       await _db.collection('rides').add(ride.toMap());
       return (success: true, message: 'Ride published successfully!');
     } catch (e) {
@@ -590,6 +604,33 @@ class FirestoreService {
     } catch (e) {
       print('[FirestoreService] cancelBooking error: $e');
       return (success: false, message: 'Failed to cancel booking.');
+    }
+  }
+
+  /// Withdraw a pending ride request (passenger action — used in the cancel window)
+  static Future<({bool success, String message})> cancelPendingRideRequest(String rideId) async {
+    if (_uid == null) return (success: false, message: 'Not signed in.');
+    try {
+      final snapshot = await _db
+          .collection('ride_requests')
+          .where('rideId', isEqualTo: rideId)
+          .where('passengerId', isEqualTo: _uid)
+          .get();
+
+      final pendingDocs = snapshot.docs.where((doc) => doc.data()['status'] == 'pending');
+      if (pendingDocs.isEmpty) {
+        return (success: false, message: 'No pending request found.');
+      }
+
+      final batch = _db.batch();
+      for (final doc in pendingDocs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      return (success: true, message: 'Request withdrawn.');
+    } catch (e) {
+      print('[FirestoreService] cancelPendingRideRequest error: $e');
+      return (success: false, message: 'Failed to withdraw request.');
     }
   }
 
@@ -2226,6 +2267,383 @@ class FirestoreService {
     }
   }
 
+  // ==========================================
+  //  RIDE GROUPS (separate from group rides)
+  // ==========================================
+
+  /// Stream a single group by ID
+  static Stream<RideGroup?> getGroupStream(String groupId) {
+    return _db.collection('groups').doc(groupId).snapshots().map((doc) {
+      if (!doc.exists || doc.data() == null) return null;
+      return RideGroup.fromMap(doc.data()!, doc.id);
+    }).handleError((error) {
+      print('[FirestoreService] getGroupStream error: $error');
+      return null;
+    });
+  }
+
+  /// Stream all active groups (not dissolved)
+  static Stream<List<RideGroup>> getActiveGroupsStream() {
+    return _db
+        .collection('groups')
+        .where('status', whereIn: ['active', 'ride_started'])
+        .snapshots()
+        .map((snapshot) {
+          final groups = snapshot.docs
+              .map((doc) => RideGroup.fromMap(doc.data(), doc.id))
+              .toList();
+          groups.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return groups;
+        })
+        .handleError((error) {
+          print('[FirestoreService] getActiveGroupsStream error: $error');
+          return <RideGroup>[];
+        });
+  }
+
+  /// Send a message in a group chat
+  static Future<bool> sendGroupMessage(String groupId, String text) async {
+    if (_uid == null || text.trim().isEmpty) return false;
+    try {
+      final profile = await getUserProfile(_uid!);
+      final senderName = profile?.displayName ??
+          _auth.currentUser?.email?.split('@').first ?? 'Unknown';
+
+      final message = GroupMessage(
+        senderId: _uid!,
+        senderName: senderName,
+        text: text.trim(),
+        seenBy: [_uid!],
+      );
+
+      await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('messages')
+          .add(message.toMap());
+      return true;
+    } catch (e) {
+      print('[FirestoreService] sendGroupMessage error: $e');
+      return false;
+    }
+  }
+
+  /// Stream messages in a group
+  static Stream<List<GroupMessage>> getGroupMessagesStream(String groupId) {
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('messages')
+        .orderBy('createdAt', descending: false)
+        .limitToLast(100)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => GroupMessage.fromMap(doc.data(), doc.id))
+            .toList())
+        .handleError((error) {
+          print('[FirestoreService] getGroupMessagesStream error: $error');
+          return <GroupMessage>[];
+        });
+  }
+
+  /// Mark a group message as seen by the current user
+  static Future<void> markMessageSeen(String groupId, String messageId) async {
+    if (_uid == null) return;
+    try {
+      await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('messages')
+          .doc(messageId)
+          .update({
+        'seenBy': FieldValue.arrayUnion([_uid]),
+      });
+    } catch (e) {
+      print('[FirestoreService] markMessageSeen error: $e');
+    }
+  }
+
+  /// Leave a group (non-creator only)
+  static Future<({bool success, String message})> leaveGroup(String groupId) async {
+    if (_uid == null) return (success: false, message: 'Not signed in.');
+    try {
+      final doc = await _db.collection('groups').doc(groupId).get();
+      if (!doc.exists) return (success: false, message: 'Group not found.');
+      final data = doc.data()!;
+      if (data['creatorId'] == _uid) {
+        return (success: false, message: 'Admin cannot leave. Dissolve the group instead.');
+      }
+      await _db.collection('groups').doc(groupId).update({
+        'members': FieldValue.arrayRemove([_uid]),
+      });
+      return (success: true, message: 'You left the group.');
+    } catch (e) {
+      print('[FirestoreService] leaveGroup error: $e');
+      return (success: false, message: 'Failed to leave group.');
+    }
+  }
+
+  /// Leave a group chat room (chat_rooms collection)
+  static Future<({bool success, String message})> leaveChatRoom(String roomId) async {
+    if (_uid == null) return (success: false, message: 'Not signed in.');
+    try {
+      final doc = await _db.collection('chat_rooms').doc(roomId).get();
+      if (!doc.exists) return (success: false, message: 'Chat room not found.');
+      final data = doc.data()!;
+      if (data['requesterId'] == _uid) {
+        return (success: false, message: 'Admin cannot leave the group.');
+      }
+
+      // Get the user's display name for the system message
+      final names = Map<String, dynamic>.from(data['participantNames'] ?? {});
+      final userName = names[_uid] ?? 'A member';
+
+      // Send system message BEFORE removing
+      await _db.collection('chat_rooms').doc(roomId).collection('messages').add({
+        'senderId': 'system',
+        'senderName': '',
+        'text': '$userName left the group',
+        'status': 'sent',
+        'createdAt': Timestamp.now(),
+      });
+
+      // Remove from participants
+      await _db.collection('chat_rooms').doc(roomId).update({
+        'participants': FieldValue.arrayRemove([_uid]),
+        'participantNames.$_uid': FieldValue.delete(),
+        'lastMessage': '$userName left the group',
+        'lastMessageTime': Timestamp.now(),
+      });
+
+      // Also remove from linked groups collection so they need to re-request
+      final groupRideId = data['groupRideId'] as String?;
+      if (groupRideId != null) {
+        try {
+          await _db.collection('groups').doc(groupRideId).update({
+            'members': FieldValue.arrayRemove([_uid]),
+          });
+        } catch (_) {}
+      }
+
+      return (success: true, message: 'You left the group.');
+    } catch (e) {
+      print('[FirestoreService] leaveChatRoom error: $e');
+      return (success: false, message: 'Failed to leave group.');
+    }
+  }
+
+  /// Kick a member from a group chat room (admin only)
+  static Future<({bool success, String message})> kickMemberFromChatRoom(
+      String roomId, String targetUid, String targetName) async {
+    if (_uid == null) return (success: false, message: 'Not signed in.');
+    try {
+      final doc = await _db.collection('chat_rooms').doc(roomId).get();
+      if (!doc.exists) return (success: false, message: 'Chat room not found.');
+      final data = doc.data()!;
+
+      // Only the creator/requester can kick
+      final creatorId = data['requesterId'] ?? (data['participants'] as List?)?.first;
+      if (_uid != creatorId) {
+        return (success: false, message: 'Only the admin can remove members.');
+      }
+
+      if (targetUid == _uid) {
+        return (success: false, message: 'You cannot remove yourself.');
+      }
+
+      // Remove from participants and participantNames
+      await _db.collection('chat_rooms').doc(roomId).update({
+        'participants': FieldValue.arrayRemove([targetUid]),
+        'participantNames.$targetUid': FieldValue.delete(),
+        'lastMessage': '$targetName was removed',
+        'lastMessageTime': Timestamp.now(),
+      });
+
+      // Send system message AFTER removing
+      await _db.collection('chat_rooms').doc(roomId).collection('messages').add({
+        'senderId': 'system',
+        'senderName': '',
+        'text': '$targetName was removed from the group',
+        'status': 'sent',
+        'createdAt': Timestamp.now(),
+      });
+
+      // Also remove from linked groups collection
+      final groupRideId = data['groupRideId'] as String?;
+      if (groupRideId != null) {
+        try {
+          await _db.collection('groups').doc(groupRideId).update({
+            'members': FieldValue.arrayRemove([targetUid]),
+          });
+        } catch (_) {}
+      }
+
+      // Notify the kicked member
+      await sendNotification(
+        userId: targetUid,
+        title: 'Removed from Group',
+        body: 'You have been removed from the group by the admin.',
+        type: 'group_kicked',
+      );
+
+      return (success: true, message: '$targetName has been removed.');
+    } catch (e) {
+      print('[FirestoreService] kickMemberFromChatRoom error: $e');
+      return (success: false, message: 'Failed to remove member.');
+    }
+  }
+
+  /// Create a new group
+  static Future<({bool success, String message})> createGroup(String name) async {
+    if (_uid == null) return (success: false, message: 'Not signed in.');
+    try {
+      final profile = await getUserProfile(_uid!);
+      final displayName = profile?.displayName ??
+          _auth.currentUser?.email?.split('@').first ?? 'Unknown';
+
+      final group = RideGroup(
+        name: name,
+        creatorId: _uid!,
+        creatorName: displayName,
+        members: [_uid!],
+        status: 'active',
+      );
+      await _db.collection('groups').add(group.toMap());
+      return (success: true, message: 'Group created successfully!');
+    } catch (e) {
+      print('[FirestoreService] createGroup error: $e');
+      return (success: false, message: 'Failed to create group.');
+    }
+  }
+
+  /// Request to join a group
+  static Future<({bool success, String message})> requestJoinGroup(String groupId) async {
+    if (_uid == null) return (success: false, message: 'Not signed in.');
+    try {
+      final groupDoc = await _db.collection('groups').doc(groupId).get();
+      if (!groupDoc.exists) return (success: false, message: 'Group not found.');
+      final group = RideGroup.fromMap(groupDoc.data()!, groupDoc.id);
+      if (group.creatorId == _uid) return (success: false, message: 'You are the admin.');
+      if (group.members.contains(_uid)) return (success: false, message: 'Already a member.');
+      if (group.isFull) return (success: false, message: 'Group is full.');
+
+      final profile = await getUserProfile(_uid!);
+      final name = profile?.displayName ?? 'Unknown';
+      await _db.collection('groups').doc(groupId).collection('join_requests').add({
+        'userId': _uid,
+        'userName': name,
+        'status': 'pending',
+        'createdAt': Timestamp.now(),
+      });
+
+      await sendNotification(
+        userId: group.creatorId,
+        title: 'New Join Request',
+        body: '$name wants to join your group "${group.name}"',
+        type: 'group_join_request',
+      );
+      return (success: true, message: 'Request sent!');
+    } catch (e) {
+      print('[FirestoreService] requestJoinGroup error: $e');
+      return (success: false, message: 'Failed to send request.');
+    }
+  }
+
+  /// Stream join requests for a group
+  static Stream<List<Map<String, dynamic>>> getGroupJoinRequests(String groupId) {
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('join_requests')
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return data;
+            }).toList())
+        .handleError((error) {
+          print('[FirestoreService] getGroupJoinRequests error: $error');
+          return <Map<String, dynamic>>[];
+        });
+  }
+
+  /// Approve a join request
+  static Future<({bool success, String message})> approveJoinRequest(
+      String groupId, String userId) async {
+    try {
+      // Find the request doc
+      final requests = await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('join_requests')
+          .where('userId', isEqualTo: userId)
+          .where('status', isEqualTo: 'pending')
+          .limit(1)
+          .get();
+      if (requests.docs.isEmpty) return (success: false, message: 'Request not found.');
+
+      final batch = _db.batch();
+      batch.update(requests.docs.first.reference, {'status': 'approved'});
+      batch.update(_db.collection('groups').doc(groupId), {
+        'members': FieldValue.arrayUnion([userId]),
+      });
+      await batch.commit();
+
+      await sendNotification(
+        userId: userId,
+        title: 'Request Approved ✅',
+        body: 'You have been added to the group!',
+        type: 'group_join_approved',
+      );
+      return (success: true, message: 'Member added!');
+    } catch (e) {
+      print('[FirestoreService] approveJoinRequest error: $e');
+      return (success: false, message: 'Failed to approve.');
+    }
+  }
+
+  /// Reject a join request
+  static Future<({bool success, String message})> rejectJoinRequest(
+      String groupId, String userId, String groupName) async {
+    try {
+      final requests = await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('join_requests')
+          .where('userId', isEqualTo: userId)
+          .where('status', isEqualTo: 'pending')
+          .limit(1)
+          .get();
+      if (requests.docs.isEmpty) return (success: false, message: 'Request not found.');
+
+      await requests.docs.first.reference.update({'status': 'rejected'});
+
+      await sendNotification(
+        userId: userId,
+        title: 'Request Declined',
+        body: 'Your request to join "$groupName" was not accepted.',
+        type: 'group_join_rejected',
+      );
+      return (success: true, message: 'Request rejected.');
+    } catch (e) {
+      print('[FirestoreService] rejectJoinRequest error: $e');
+      return (success: false, message: 'Failed to reject.');
+    }
+  }
+
+  /// End a group ride (dissolve)
+  static Future<({bool success, String message})> endGroupRide(String groupId) async {
+    try {
+      await _db.collection('groups').doc(groupId).update({
+        'status': 'dissolved',
+      });
+      return (success: true, message: 'Group ride ended.');
+    } catch (e) {
+      print('[FirestoreService] endGroupRide error: $e');
+      return (success: false, message: 'Failed to end group ride.');
+    }
+  }
 
 }
 

@@ -21,19 +21,48 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
   String _searchFrom = '';
   String _searchTo = '';
 
+  // NSU campus aliases — if the user types any of these, match ALL of them
+  static const _nsuAliases = [
+    'nsu',
+    'north south',
+    'north south university',
+    'nsu main campus',
+    'nsu main campus road',
+    'nsu admin',
+    'nsu admin building',
+    'nsu library',
+  ];
+
+  /// Expand a search term: if it looks like an NSU keyword, return all aliases.
+  /// Otherwise return the original term as a single-element list.
+  List<String> _expandSearch(String term) {
+    if (term.isEmpty) return [];
+    final isNsu = _nsuAliases.any((alias) =>
+        alias.contains(term) || term.contains(alias));
+    return isNsu ? _nsuAliases : [term];
+  }
+
+  bool _matchesAny(String haystack, List<String> needles) {
+    final lower = haystack.toLowerCase();
+    return needles.any((n) => lower.contains(n));
+  }
+
+  List<Ride> _applyFilters(List<Ride> rides) {
+    final fromTerms = _expandSearch(_searchFrom);
+    final toTerms = _expandSearch(_searchTo);
+
+    return rides.where((ride) {
+      final matchFrom = fromTerms.isEmpty || _matchesAny(ride.origin, fromTerms);
+      final matchTo = toTerms.isEmpty || _matchesAny(ride.destination, toTerms);
+      return matchFrom && matchTo;
+    }).toList();
+  }
+
   void _updateFilters() {
     setState(() {
       _searchFrom = _fromController.text.trim().toLowerCase();
       _searchTo = _toController.text.trim().toLowerCase();
     });
-  }
-
-  List<Ride> _applyFilters(List<Ride> rides) {
-    return rides.where((ride) {
-      final matchFrom = _searchFrom.isEmpty || ride.origin.toLowerCase().contains(_searchFrom);
-      final matchTo = _searchTo.isEmpty || ride.destination.toLowerCase().contains(_searchTo);
-      return matchFrom && matchTo;
-    }).toList();
   }
 
   @override

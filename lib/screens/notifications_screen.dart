@@ -112,22 +112,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                             (context, index) {
-                          // Premium Staggered Animation with fluid curve
-                          return TweenAnimationBuilder(
-                            duration: Duration(milliseconds: 500 + (index * 120)),
-                            tween: Tween<double>(begin: 0, end: 1),
-                            curve: Curves.easeOutQuart,
-                            builder: (context, value, child) => Opacity(
-                              opacity: value,
-                              child: Transform.translate(
-                                offset: Offset(0, 40 * (1 - value)),
-                                child: child,
-                              ),
-                            ),
+                          return RepaintBoundary(
                             child: _buildNotificationCard(context, notifications[index], isDark),
                           );
                         },
                         childCount: notifications.length,
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: false,
                       ),
                     ),
                   );

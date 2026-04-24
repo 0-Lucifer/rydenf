@@ -400,48 +400,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 4),
               Text("We're here to help", style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTextSecondary)),
               const SizedBox(height: 24),
-              GestureDetector(
-                onTap: () {
-                  final uri = Uri(
-                    scheme: 'mailto',
-                    path: 'ahammed.jumma@northsouth.edu',
-                    queryParameters: {'subject': 'Ryden Support'},
-                  );
-                  launchUrl(uri);
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: kPrimaryBlue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(Icons.mail_rounded, color: kPrimaryBlue, size: 28),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "For any support, complaints, or help",
-                        style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTextSecondary),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "ahammed.jumma@northsouth.edu",
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: kPrimaryBlue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              Text(
+                "For any support, complaints or help\nyou can contact us:",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTextSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 20),
+
+              // Developer contact
+              _buildContactCard(
+                ctx: ctx,
+                label: "Lead Developer",
+                email: "ahammed.jumma@northsouth.edu",
+                icon: Icons.person_rounded,
+              ),
+              const SizedBox(height: 12),
+
+              // Developer team contact
+              _buildContactCard(
+                ctx: ctx,
+                label: "Developer Team",
+                email: "blackdevelopers221@gmail.com",
+                icon: Icons.groups_rounded,
               ),
               const SizedBox(height: 16),
               GestureDetector(
@@ -692,6 +672,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text("Log Out"),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildContactCard({
+    required BuildContext ctx,
+    required String label,
+    required String email,
+    required IconData icon,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        final uri = Uri(
+          scheme: 'mailto',
+          path: email,
+          queryParameters: {'subject': 'Ryden Support'},
+        );
+        launchUrl(uri);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: kPrimaryBlue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: kPrimaryBlue, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: kTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    email,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: kPrimaryBlue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.open_in_new_rounded, color: kPrimaryBlue, size: 18),
+          ],
+        ),
       ),
     );
   }
