@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/group_model.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
-import 'group_chat_screen.dart';
+
 
 class GroupDetailScreen extends StatelessWidget {
   final String groupId;
@@ -452,40 +452,6 @@ class GroupDetailScreen extends StatelessWidget {
       child: Row(
         children: [
           // Chat button (members only)
-          if (isMember)
-            Expanded(
-              child: SizedBox(
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    // Build member names map
-                    final memberNames = <String, String>{};
-                    for (final uid in group.members) {
-                      final name = await _getMemberName(uid);
-                      memberNames[uid] = name;
-                    }
-                    if (!context.mounted) return;
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => GroupChatScreen(
-                        groupId: groupId,
-                        groupName: group.name,
-                        creatorId: group.creatorId,
-                        memberNames: memberNames,
-                      ),
-                    ));
-                  },
-                  icon: const Icon(Icons.chat_rounded, color: Colors.white, size: 20),
-                  label: Text("Chat", style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white,
-                  )),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ),
 
           // Join button (non-members)
           if (!isMember && !group.isFull)

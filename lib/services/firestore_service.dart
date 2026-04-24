@@ -11,7 +11,7 @@ import '../models/chat_room_model.dart';
 import '../models/chat_message_model.dart';
 import '../models/rating_model.dart';
 import '../models/group_model.dart';
-import '../models/group_message_model.dart';
+
 
 class FirestoreService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -1818,43 +1818,6 @@ class FirestoreService {
   }
 
   /// Create a group chat for a group ride
-  static Future<ChatRoom?> createGroupChat({
-    required String groupRideId,
-    required String groupTitle,
-    required List<String> participantIds,
-    required Map<String, String> participantNames,
-  }) async {
-    if (_uid == null) return null;
-
-    try {
-      // Check if group chat already exists
-      final snapshot = await _db
-          .collection('chat_rooms')
-          .where('type', isEqualTo: 'group')
-          .where('groupRideId', isEqualTo: groupRideId)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        return ChatRoom.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
-      }
-
-      final room = ChatRoom(
-        type: 'group',
-        participants: participantIds,
-        participantNames: participantNames,
-        groupRideId: groupRideId,
-        groupTitle: groupTitle,
-        status: 'active',
-      );
-
-      final docRef = await _db.collection('chat_rooms').add(room.toMap());
-      final newDoc = await docRef.get();
-      return ChatRoom.fromMap(newDoc.data()!, newDoc.id);
-    } catch (e) {
-      print('[FirestoreService] createGroupChat error: $e');
-      return null;
-    }
-  }
 
   /// Accept a chat request (recipient accepts pending personal chat)
   static Future<({bool success, String message})> acceptChatRequest(String roomId) async {
@@ -1963,19 +1926,7 @@ class FirestoreService {
         });
   }
 
-  /// Delete a message (only by sender)
-  static Future<void> deleteMessage(String roomId, String messageId) async {
-    try {
-      await _db
-          .collection('chat_rooms')
-          .doc(roomId)
-          .collection('messages')
-          .doc(messageId)
-          .delete();
-    } catch (e) {
-      print('[FirestoreService] deleteMessage error: $e');
-    }
-  }
+
 
   /// Mark all messages from others as 'delivered' when entering a chat
   static Future<void> markMessagesDelivered(String roomId) async {
@@ -2095,28 +2046,7 @@ class FirestoreService {
   }
 
   /// Delete expired chat rooms — limited to 20 per run to avoid heavy startup
-  static Future<void> cleanupExpiredChats() async {
-    try {
-      final now = Timestamp.now();
-      final expired = await _db
-          .collection('chat_rooms')
-          .where('expiresAt', isLessThan: now)
-          .limit(20)
-          .get();
 
-      for (final doc in expired.docs) {
-        final messages = await doc.reference.collection('messages').limit(200).get();
-        final ops = <void Function(WriteBatch)>[];
-        for (final msg in messages.docs) {
-          ops.add((b) => b.delete(msg.reference));
-        }
-        ops.add((b) => b.delete(doc.reference));
-        await _commitInChunks(ops);
-      }
-    } catch (e) {
-      print('[FirestoreService] cleanupExpiredChats error: $e');
-    }
-  }
 
   // ==========================================
   //  7-DAY GLOBAL CLEANUP
@@ -2301,67 +2231,6 @@ class FirestoreService {
         });
   }
 
-  /// Send a message in a group chat
-  static Future<bool> sendGroupMessage(String groupId, String text) async {
-    if (_uid == null || text.trim().isEmpty) return false;
-    try {
-      final profile = await getUserProfile(_uid!);
-      final senderName = profile?.displayName ??
-          _auth.currentUser?.email?.split('@').first ?? 'Unknown';
-
-      final message = GroupMessage(
-        senderId: _uid!,
-        senderName: senderName,
-        text: text.trim(),
-        seenBy: [_uid!],
-      );
-
-      await _db
-          .collection('groups')
-          .doc(groupId)
-          .collection('messages')
-          .add(message.toMap());
-      return true;
-    } catch (e) {
-      print('[FirestoreService] sendGroupMessage error: $e');
-      return false;
-    }
-  }
-
-  /// Stream messages in a group
-  static Stream<List<GroupMessage>> getGroupMessagesStream(String groupId) {
-    return _db
-        .collection('groups')
-        .doc(groupId)
-        .collection('messages')
-        .orderBy('createdAt', descending: false)
-        .limitToLast(100)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => GroupMessage.fromMap(doc.data(), doc.id))
-            .toList())
-        .handleError((error) {
-          print('[FirestoreService] getGroupMessagesStream error: $error');
-          return <GroupMessage>[];
-        });
-  }
-
-  /// Mark a group message as seen by the current user
-  static Future<void> markMessageSeen(String groupId, String messageId) async {
-    if (_uid == null) return;
-    try {
-      await _db
-          .collection('groups')
-          .doc(groupId)
-          .collection('messages')
-          .doc(messageId)
-          .update({
-        'seenBy': FieldValue.arrayUnion([_uid]),
-      });
-    } catch (e) {
-      print('[FirestoreService] markMessageSeen error: $e');
-    }
-  }
 
   /// Leave a group (non-creator only)
   static Future<({bool success, String message})> leaveGroup(String groupId) async {
@@ -2418,10 +2287,43 @@ class FirestoreService {
       // Also remove from linked groups collection so they need to re-request
       final groupRideId = data['groupRideId'] as String?;
       if (groupRideId != null) {
+        // Restore seat via transaction to prevent race conditions
+        try {
+          await _db.runTransaction((txn) async {
+            final rideRef = _db.collection('group_rides').doc(groupRideId);
+            final rideSnap = await txn.get(rideRef);
+            if (rideSnap.exists) {
+              final rideData = rideSnap.data()!;
+              final currentSeats = rideData['seatsAvailable'] as int? ?? 0;
+              final updates = <String, dynamic>{
+                'seatsAvailable': currentSeats + 1,
+                'passengers': FieldValue.arrayRemove([_uid]),
+              };
+              // If ride was full, set back to active
+              if (rideData['status'] == 'full') {
+                updates['status'] = 'active';
+              }
+              txn.update(rideRef, updates);
+            }
+          });
+        } catch (_) {}
+
         try {
           await _db.collection('groups').doc(groupRideId).update({
             'members': FieldValue.arrayRemove([_uid]),
           });
+        } catch (_) {}
+
+        // Delete the user's ride request so they must re-request
+        try {
+          final reqSnap = await _db
+              .collection('group_ride_requests')
+              .where('groupRideId', isEqualTo: groupRideId)
+              .where('passengerId', isEqualTo: _uid)
+              .get();
+          for (final reqDoc in reqSnap.docs) {
+            await reqDoc.reference.delete();
+          }
         } catch (_) {}
       }
 
@@ -2471,10 +2373,42 @@ class FirestoreService {
       // Also remove from linked groups collection
       final groupRideId = data['groupRideId'] as String?;
       if (groupRideId != null) {
+        // Restore seat via transaction to prevent race conditions
+        try {
+          await _db.runTransaction((txn) async {
+            final rideRef = _db.collection('group_rides').doc(groupRideId);
+            final rideSnap = await txn.get(rideRef);
+            if (rideSnap.exists) {
+              final rideData = rideSnap.data()!;
+              final currentSeats = rideData['seatsAvailable'] as int? ?? 0;
+              final updates = <String, dynamic>{
+                'seatsAvailable': currentSeats + 1,
+                'passengers': FieldValue.arrayRemove([targetUid]),
+              };
+              if (rideData['status'] == 'full') {
+                updates['status'] = 'active';
+              }
+              txn.update(rideRef, updates);
+            }
+          });
+        } catch (_) {}
+
         try {
           await _db.collection('groups').doc(groupRideId).update({
             'members': FieldValue.arrayRemove([targetUid]),
           });
+        } catch (_) {}
+
+        // Delete the kicked user's ride request so they must re-request
+        try {
+          final reqSnap = await _db
+              .collection('group_ride_requests')
+              .where('groupRideId', isEqualTo: groupRideId)
+              .where('passengerId', isEqualTo: targetUid)
+              .get();
+          for (final reqDoc in reqSnap.docs) {
+            await reqDoc.reference.delete();
+          }
         } catch (_) {}
       }
 
