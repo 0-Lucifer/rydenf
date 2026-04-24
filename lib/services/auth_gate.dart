@@ -16,10 +16,8 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  // Whether we've finished the initial auth check
-  bool _resolved = false;
-  // The result of the initial check: was the user previously logged in locally?
-  bool _wasLoggedIn = false;
+  // Whether the initial auth + privacy check is done
+  bool _ready = false;
   // Whether the user has accepted the privacy policy
   bool _privacyAccepted = false;
   bool _privacyChecked = false;
@@ -27,10 +25,10 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    _checkPrivacyAndLogin();
+    _init();
   }
 
-  Future<void> _checkPrivacyAndLogin() async {
+  Future<void> _init() async {
     // Check privacy policy acceptance first
     final accepted = await PrivacyPolicyScreen.hasAccepted();
     if (mounted) {
@@ -43,31 +41,39 @@ class _AuthGateState extends State<AuthGate> {
     // If privacy not accepted, stop here — show the policy screen
     if (!accepted) return;
 
-    // Otherwise, proceed with the normal login check
-    await _checkLocalLogin();
-  }
+    // Wait for Firebase Auth to restore any persisted session.
+    // authStateChanges() fires immediately with the cached user (or null).
+    // We await its first emission so we never flash the login screen.
+    await FirebaseAuth.instance.authStateChanges().first;
 
-  Future<void> _checkLocalLogin() async {
-    final savedUid = await AuthService.getSavedLoginUid();
-    _wasLoggedIn = savedUid != null && savedUid.isNotEmpty;
-
-    if (_wasLoggedIn && FirebaseAuth.instance.currentUser == null) {
-      // User was logged in before but Firebase hasn't restored yet.
-      // Give Firebase extra time to restore the persisted session.
-      for (var i = 0; i < 10; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (FirebaseAuth.instance.currentUser != null) break;
-      }
+    // Keep local login flag in sync for any other code that reads it
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await AuthService.saveLoginLocally(user.uid);
     }
 
     if (mounted) {
-      setState(() => _resolved = true);
+      setState(() => _ready = true);
     }
   }
 
   void _onPrivacyAccepted() {
     setState(() => _privacyAccepted = true);
-    _checkLocalLogin();
+    // Re-run the auth restoration now that privacy is accepted
+    _initAuth();
+  }
+
+  Future<void> _initAuth() async {
+    await FirebaseAuth.instance.authStateChanges().first;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await AuthService.saveLoginLocally(user.uid);
+    }
+
+    if (mounted) {
+      setState(() => _ready = true);
+    }
   }
 
   @override
@@ -86,8 +92,8 @@ class _AuthGateState extends State<AuthGate> {
       return PrivacyPolicyScreen(onAccepted: _onPrivacyAccepted);
     }
 
-    // Still checking local login state
-    if (!_resolved) {
+    // Still waiting for Firebase to restore the session
+    if (!_ready) {
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFF2E7CF6)),
@@ -126,3 +132,4 @@ class _AuthGateState extends State<AuthGate> {
     );
   }
 }
+

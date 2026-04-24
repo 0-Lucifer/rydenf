@@ -44,7 +44,13 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     super.dispose();
   }
 
-  void _navigateToHome() {
+  Future<void> _navigateToHome() async {
+    // Persist login so user stays signed in across app restarts
+    final uid = AuthService.currentUser?.uid;
+    if (uid != null) {
+      await AuthService.saveLoginLocally(uid);
+    }
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const MainWrapper()),
       (route) => false,
@@ -198,6 +204,27 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                     ),
                   ],
                 ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Spam hint
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 15, color: const Color(0xFF94A3B8)),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      "Can't find it? Check your spam or junk folder.",
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: const Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
               const Spacer(flex: 2),

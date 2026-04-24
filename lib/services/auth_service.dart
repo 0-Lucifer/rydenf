@@ -9,13 +9,13 @@ class AuthService {
   static const String _loginUidKey = 'ryden_logged_in_uid';
 
   /// Save login state to device so it survives app kills
-  static Future<void> _saveLoginLocally(String uid) async {
+  static Future<void> saveLoginLocally(String uid) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_loginUidKey, uid);
   }
 
   /// Clear saved login state (called on logout)
-  static Future<void> _clearLocalLogin() async {
+  static Future<void> clearLocalLogin() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_loginUidKey);
   }
@@ -71,6 +71,7 @@ class AuthService {
 
       // Create user profile in Firestore with all fields
       if (credential.user != null) {
+        await saveLoginLocally(credential.user!.uid);
         await FirestoreService.createUserProfile(
           uid: credential.user!.uid,
           email: trimmedEmail,
@@ -123,7 +124,7 @@ class AuthService {
 
       // Persist login locally so it survives app kills
       if (credential.user != null) {
-        await _saveLoginLocally(credential.user!.uid);
+        await saveLoginLocally(credential.user!.uid);
       }
 
       return (
@@ -149,7 +150,7 @@ class AuthService {
   // ─── Sign Out ────────────────────────────────────────
   static Future<void> signOut() async {
     FirestoreService.clearStreamCaches();
-    await _clearLocalLogin();
+    await clearLocalLogin();
     await _auth.signOut();
   }
 
