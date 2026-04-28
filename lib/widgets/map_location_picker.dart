@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart' as geo;
+import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 import '../services/location_service.dart';
 import '../services/places_service.dart';
 
@@ -81,35 +85,56 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     super.dispose();
   }
 
-  // Takes map coordinates and turns them into a readable address sting
+  // Takes map coordinates and turns them into a readable address string
   Future<void> _reverseGeocode(LatLng pos) async {
     setState(() => _isResolvingAddress = true);
     try {
-      final placemarks = await geo.placemarkFromCoordinates(
-        pos.latitude,
-        pos.longitude,
-      );
-      if (placemarks.isNotEmpty && mounted) {
-        final p = placemarks.first;
-        final parts = <String>[
-          if (p.name != null && p.name!.isNotEmpty && p.name != p.postalCode)
-            p.name!,
-          if (p.subLocality != null && p.subLocality!.isNotEmpty)
-            p.subLocality!,
-          if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
-          if (p.administrativeArea != null &&
-              p.administrativeArea!.isNotEmpty)
-            p.administrativeArea!,
-        ];
-        setState(() {
-          _resolvedAddress =
-              parts.isNotEmpty ? parts.join(', ') : 'Unknown location';
-        });
+      if (kIsWeb) {
+        // geocoding package doesn't support web — use Geocoding REST API instead
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/geocode/json'
+          '?latlng=${pos.latitude},${pos.longitude}'
+          '&key=${AppConfig.googleMapsApiKey}',
+        );
+        final response = await http.get(url);
+        if (response.statusCode == 200 && mounted) {
+          final data = jsonDecode(response.body);
+          final results = data['results'] as List?;
+          if (results != null && results.isNotEmpty) {
+            setState(() {
+              _resolvedAddress =
+                  results[0]['formatted_address'] as String? ?? 'Unknown location';
+            });
+          } else {
+            setState(() => _resolvedAddress = 'Unknown location');
+          }
+        }
+      } else {
+        final placemarks = await geo.placemarkFromCoordinates(
+          pos.latitude,
+          pos.longitude,
+        );
+        if (placemarks.isNotEmpty && mounted) {
+          final p = placemarks.first;
+          final parts = <String>[
+            if (p.name != null && p.name!.isNotEmpty && p.name != p.postalCode)
+              p.name!,
+            if (p.subLocality != null && p.subLocality!.isNotEmpty)
+              p.subLocality!,
+            if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
+            if (p.administrativeArea != null &&
+                p.administrativeArea!.isNotEmpty)
+              p.administrativeArea!,
+          ];
+          setState(() {
+            _resolvedAddress =
+                parts.isNotEmpty ? parts.join(', ') : 'Unknown location';
+          });
+        }
       }
     } catch (_) {
       if (mounted) {
-        setState(
-            () => _resolvedAddress = 'Unable to determine address');
+        setState(() => _resolvedAddress = 'Unable to determine address');
       }
     } finally {
       if (mounted) setState(() => _isResolvingAddress = false);
