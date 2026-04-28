@@ -30,8 +30,8 @@ class LocationService {
     }
 
     if (permission == LocationPermission.deniedForever) {
-      // Open app settings so user can manually enable
-      await openAppSettings();
+      // Open app settings so user can manually enable (mobile only)
+      if (!kIsWeb) await openAppSettings();
       return false;
     }
 

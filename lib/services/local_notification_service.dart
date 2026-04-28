@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -37,6 +38,7 @@ class LocalNotificationService {
 
   /// Initialize the plugin and FCM (call once in main.dart)
   Future<void> init() async {
+    if (kIsWeb) return; // flutter_local_notifications not supported on web
     if (_initialized) return;
 
     // ─── Local Notifications Setup ───
@@ -140,6 +142,7 @@ class LocalNotificationService {
     String channelId = 'ryden_activity',
     String channelName = 'Ride Activity',
   }) async {
+    if (kIsWeb) return; // Not supported on web
     final androidDetails = AndroidNotificationDetails(
       channelId,
       channelName,
@@ -185,6 +188,7 @@ class LocalNotificationService {
 
   /// Start listening for new Firestore notifications AND chat messages
   void startListening() {
+    if (kIsWeb) return; // No local notifications on web
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 

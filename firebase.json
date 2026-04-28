@@ -1,1 +1,53 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"ryden-2","appId":"1:318410227659:android:97f8e5f7e5c2126820404e","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"ryden-2","configurations":{"android":"1:318410227659:android:97f8e5f7e5c2126820404e","ios":"1:318410227659:ios:65299ecad6a8802520404e","web":"1:318410227659:web:3a0c26f79e6d15bb20404e","windows":"1:318410227659:web:f7cb388c7d8f662820404e"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "ryden-2",
+          "appId": "1:318410227659:android:97f8e5f7e5c2126820404e",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "ryden-2",
+          "configurations": {
+            "android": "1:318410227659:android:97f8e5f7e5c2126820404e",
+            "ios": "1:318410227659:ios:65299ecad6a8802520404e",
+            "web": "1:318410227659:web:3a0c26f79e6d15bb20404e",
+            "windows": "1:318410227659:web:f7cb388c7d8f662820404e"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|wasm)",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
+      },
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+          { "key": "X-Content-Type-Options", "value": "nosniff" }
+        ]
+      }
+    ]
+  }
+}

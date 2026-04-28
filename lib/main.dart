@@ -29,10 +29,11 @@ Future<void> main() async {
     persistenceEnabled: true,
   );
 
-  await LocalNotificationService.instance.init();
-
-  // Start background service to keep notifications alive when app is closed
-  await BackgroundNotificationService.initialize();
+  // Local notifications and background service are Android/iOS only
+  if (!kIsWeb) {
+    await LocalNotificationService.instance.init();
+    await BackgroundNotificationService.initialize();
+  }
 
   // Prefetch the primary font family so text renders instantly
   GoogleFonts.config.allowRuntimeFetching = true;
@@ -41,15 +42,19 @@ Future<void> main() async {
   // Fire-and-forget stale data cleanup once at startup
   FirestoreService.cleanupAllOldData();
 
-  // Lock orientation for consistent UX
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  // Lock orientation for consistent UX (mobile only)
+  if (!kIsWeb) {
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  }
 
   runApp(const RydenApp());
 
-  // Request location permission AFTER first frame renders (non-blocking)
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _requestLocationPermission();
-  });
+  // Request location permission AFTER first frame renders (mobile only)
+  if (!kIsWeb) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestLocationPermission();
+    });
+  }
 }
 
 /// Request location permission at startup so the OS dialog appears early.

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -16,6 +17,7 @@ class BackgroundNotificationService {
 
   /// Initialize and start the background service. Call once from main().
   static Future<void> initialize() async {
+    if (kIsWeb) return; // No background service on web
     final service = FlutterBackgroundService();
 
     await service.configure(
@@ -39,17 +41,20 @@ class BackgroundNotificationService {
   /// Notify the background service that the app is in foreground
   /// (so it skips showing notifications to avoid duplicates)
   static void notifyAppResumed() {
+    if (kIsWeb) return;
     FlutterBackgroundService().invoke('appResumed');
   }
 
   /// Notify the background service that the app is in background
   /// (so it starts showing notifications)
   static void notifyAppPaused() {
+    if (kIsWeb) return;
     FlutterBackgroundService().invoke('appPaused');
   }
 
   /// Tell the background service which chat room the user is viewing
   static void setActiveChatRoom(String? roomId) {
+    if (kIsWeb) return;
     FlutterBackgroundService().invoke('activeChatRoom', {'roomId': roomId ?? ''});
   }
 }

@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 
 /// Google Places Autocomplete service using direct HTTP calls.
@@ -21,14 +21,10 @@ class PlacesService {
         '&key=$_apiKey',
       );
 
-      final client = HttpClient();
-      final request = await client.getUrl(url);
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      client.close();
+      final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(body);
+        final data = jsonDecode(response.body);
         final predictions = data['predictions'] as List? ?? [];
         return predictions.map((p) => PlacePrediction.fromJson(p)).toList();
       }
@@ -51,14 +47,10 @@ class PlacesService {
         '&key=$_apiKey',
       );
 
-      final client = HttpClient();
-      final request = await client.getUrl(url);
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      client.close();
+      final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(body);
+        final data = jsonDecode(response.body);
         final location = data['result']?['geometry']?['location'];
         if (location != null) {
           final lat = (location['lat'] as num).toDouble();

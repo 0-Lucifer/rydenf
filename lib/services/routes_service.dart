@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 
 /// Google Routes API service for distance, duration, and polyline.
@@ -36,19 +36,18 @@ class RoutesService {
         'computeAlternativeRoutes': false,
       });
 
-      final client = HttpClient();
-      final request = await client.postUrl(url);
-      request.headers.set('Content-Type', 'application/json');
-      request.headers.set('X-Goog-Api-Key', _apiKey);
-      request.headers.set('X-Goog-FieldMask', 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline');
-      request.write(body);
-
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
-      client.close();
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': _apiKey,
+          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+        },
+        body: body,
+      );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
+        final data = jsonDecode(response.body);
         final routes = data['routes'] as List?;
         if (routes != null && routes.isNotEmpty) {
           final route = routes[0];
@@ -66,7 +65,7 @@ class RoutesService {
           );
         }
       } else {
-        debugPrint('[RoutesService] API error ${response.statusCode}: $responseBody');
+        debugPrint('[RoutesService] API error ${response.statusCode}: ${response.body}');
       }
       return null;
     } catch (e) {
