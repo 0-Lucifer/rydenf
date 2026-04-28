@@ -177,14 +177,20 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
       setState(() => _isSearching = true);
-      final results = await PlacesService.getSuggestions(query);
-      if (mounted) {
-        setState(() {
-          _searchResults = results;
-          _showSearchResults = results.isNotEmpty;
-          _isSearching = false;
-        });
+      try {
+        final results = await PlacesService.getSuggestions(query);
+        if (mounted) {
+          setState(() {
+            _searchResults = results;
+            _showSearchResults = results.isNotEmpty;
+            _isSearching = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('[MapLocationPicker] autocomplete error: $e');
+        if (mounted) setState(() => _isSearching = false);
       }
     });
   }
