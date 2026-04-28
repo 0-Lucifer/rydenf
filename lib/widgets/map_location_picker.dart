@@ -241,7 +241,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
             onMapCreated: (controller) => _mapController = controller,
             onCameraMove: _onCameraMove,
             onCameraIdle: _onCameraIdle,
-            myLocationEnabled: true,
+            myLocationEnabled: !kIsWeb, // not supported on web
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
