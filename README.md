@@ -1,220 +1,227 @@
-<div align="center">
+<p align="center">
+  <img src="assets/images/logo.png" alt="Ryden Logo" width="120"/>
+</p>
 
-# 🚗 RYDEN
+<h1 align="center">Ryden</h1>
+<p align="center">
+  <b>Community ride sharing — find a ride, offer a ride, ride together.</b>
+</p>
 
-### _Your Campus Ride-Sharing Companion_
-
-[![Flutter](https://img.shields.io/badge/Flutter-3.10+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
-[![Firebase](https://img.shields.io/badge/Firebase-Backend-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Dart](https://img.shields.io/badge/Dart-3.0+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
-[![License](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
-
-**Ryden** connects riders and drivers in a clean, real-time platform — built for students who share daily commutes.
-Offer a ride, find one, or host a group ride in seconds.
-
----
-
-</div>
-
-## ✨ Feature Highlights
-
-| Feature | Description |
-|---|---|
-| 🚘 **Offer a Ride** | Drivers can publish rides with origin, destination, stops, vehicle type (Car / Bike / CNG), pricing, and seat count |
-| 🔍 **Find a Ride** | Passengers can browse, filter by location/date, and request seats — instantly booked or pending driver approval |
-| 👥 **Group Rides** | Host or join campus group rides with built-in seat management, request approval, and auto-expiry |
-| ⚡ **Instant Match** | Toggle instant booking so passengers skip the approval step and get confirmed immediately (race-safe via Firestore transactions) |
-| 💬 **Real-Time Chat** | 1-on-1 DMs between riders + auto-created group chats for accepted group rides — with sent/delivered/seen status |
-| 🔔 **Smart Notifications** | In-app notification centre with ride requests, approvals, chat alerts, and badge counts — plus local push notifications |
-| 👤 **Rich Profiles** | Custom display names, university, gender, profile pictures, and public profile pop-ups when tapping any user |
-| 🗓️ **Premium Pickers** | Beautifully themed date & time pickers with indigo accents, custom typography, and smooth dial interactions |
-| 🧹 **Auto-Cleanup** | Stale notifications (7 days), old rides (7 days), expired group rides (24h), and expired chats are cleaned up automatically on startup |
-| 💾 **Offline-Ready** | Firestore persistence with a capped 100 MB offline cache so the app works even with spotty connections |
+<p align="center">
+  <a href="https://ryden-2.web.app">
+    <img src="https://img.shields.io/badge/Live%20Web%20App-ryden--2.web.app-4F46E5?style=for-the-badge&logo=firebase" alt="Live Web App"/>
+  </a>
+  <img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter" alt="Flutter"/>
+  <img src="https://img.shields.io/badge/Firebase-Powered-FFCA28?style=for-the-badge&logo=firebase" alt="Firebase"/>
+  <img src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Web-success?style=for-the-badge" alt="Platform"/>
+</p>
 
 ---
 
-## 🏗️ Architecture
+## 📖 Overview
 
-```
-lib/
-├── main.dart                        # Entry point, Firebase init, cache config, cleanup
-├── firebase_options.dart            # Auto-generated Firebase config
-│
-├── models/                          # Clean data classes with Firestore (de)serialisation
-│   ├── ride_model.dart              # Ride with vehicle type, stops, instant match toggle
-│   ├── ride_request_model.dart      # Seat request (pending / accepted / rejected)
-│   ├── group_ride_model.dart        # Group ride with host, seats, status
-│   ├── group_ride_request_model.dart
-│   ├── chat_room_model.dart         # 1:1 and group chat rooms with expiry
-│   ├── chat_message_model.dart      # Messages with sent/delivered/seen status
-│   ├── notification_model.dart      # In-app notification entries
-│   └── user_model.dart              # User profile with uni, gender, avatar
-│
-├── services/                        # Business logic & backend
-│   ├── auth_service.dart            # Firebase Auth (email/password, sign up, verification)
-│   ├── auth_gate.dart               # Auth state listener → login or main app
-│   ├── firestore_service.dart       # All Firestore CRUD, transactions, batch ops, cleanup
-│   └── local_notification_service.dart  # Local push notifications via flutter_local_notifications
-│
-├── screens/                         # 19 fully-designed screens
-│   ├── home_screen.dart             # Hero banner, quick actions, recent rides
-│   ├── offer_ride_screen.dart       # Multi-step ride creation form
-│   ├── available_rides.dart         # Browse + filter rides by location/date
-│   ├── ride_detail_screen.dart      # Full ride info, request seat, manage passengers
-│   ├── my_rides_screen.dart         # Driver's ride management dashboard
-│   ├── ongoing_ride_screen.dart     # Active ride tracking & passenger list
-│   ├── group_rides_screen.dart      # Browse group rides with search/filter
-│   ├── host_group_ride_screen.dart  # Create a group ride
-│   ├── group_ride_card_details.dart # Group ride details, join, enter GC
-│   ├── group_ride_requests_screen.dart # Host manages incoming requests
-│   ├── trips_screen.dart            # Ride history for both drivers and passengers
-│   ├── chat_list_screen.dart        # All conversations with unread badges
-│   ├── chat_screen.dart             # Real-time messaging with status indicators
-│   ├── notifications_screen.dart    # Notification centre with mark-all-read
-│   ├── profile_screen.dart          # User profile with stats
-│   ├── edit_profile_screen.dart     # Edit name, university, gender, avatar
-│   ├── login_screen.dart            # Email/password login
-│   ├── signup_screen.dart           # Registration + email verification
-│   └── email_verification_screen.dart
-│
-└── widgets/                         # Reusable UI components
-    ├── main_wrapper.dart            # Bottom nav bar with badge counts
-    ├── ride_card.dart               # Ride preview card with driver info
-    ├── action_tile.dart             # Home screen quick-action buttons
-    ├── profile_popup.dart           # Tap-to-view public profile modal
-    └── premium_pickers.dart         # Custom-themed date & time pickers
-```
+**Ryden** is a community-driven ride-sharing application built with Flutter. It connects people who are heading in the same direction — whether for daily commutes, university trips, or group outings. Instead of hailing a cab, Ryden lets real people offer and find rides with others in their community, reducing cost and carbon footprint while building connections.
+
+The app runs natively on **Android** and **iOS**, and is also available as a **Progressive Web App (PWA)** deployed on Firebase Hosting.
+
+🌐 **Live:** [https://rydenbd.com](https://rydenbd.com)
 
 ---
 
-## 🛡️ Database Safety
+## ✨ Features
 
-Ryden isn't just a prototype — it handles real-world edge cases:
+### 🚗 Ride Sharing
+- **Offer a Ride** — Set your route, seats, vehicle type (car/bike), and fare. Dynamic distance-based pricing calculated via the Google Routes API.
+- **Find a Ride** — Browse available rides filtered by destination and departure.
+- **Ride Requests** — Send and receive join requests with real-time Firestore updates.
+- **Ongoing Ride Tracking** — Live GPS tracking of active rides for both hosts and passengers.
 
-| Concern | Solution |
-|---|---|
-| **Double-booking** | Instant bookings use **Firestore transactions** that re-read seat counts before committing |
-| **Batch overflow** | All bulk writes use a **chunk helper** that splits operations into groups of 450 (below Firestore's 500 limit) |
-| **Stale data bloat** | **Auto-cleanup** on startup deletes old notifications, completed rides, expired group rides, and expired chats |
-| **Storage creep** | Offline cache is **capped at 100 MB** so phones don't silently fill up |
-| **Seat integrity** | Group ride seats are **only deducted when the host accepts**, not on request — preventing phantom reservations |
+### 👥 Group Rides
+- **Create Groups** — Organize recurring rides with a fixed group of people.
+- **Group Chat** — Built-in real-time messaging for each group.
+- **Seat Management** — Dynamic seat availability with request/approval flow.
+- **Group Admin Controls** — Hosts can manage members, approve requests, and remove riders.
+
+### 💬 Messaging
+- **Chat System** — One-on-one and group real-time chat powered by Firestore.
+- **Chat List** — Unified inbox showing all active conversations.
+
+### 🗺️ Maps & Location
+- **Uber-Style Map Picker** — Full-screen map with a fixed center pin for intuitive location selection.
+- **Places Autocomplete** — Search for any location in Bangladesh with instant suggestions.
+- **Route Visualization** — Polyline-rendered routes between pickup and destination.
+- **Reverse Geocoding** — Converts GPS coordinates to readable addresses on all platforms.
+
+### 🔔 Notifications
+- **Push Notifications** — Firebase Cloud Messaging (FCM) for ride requests, approvals, and messages.
+- **Background Service** — Persistent notification listener keeps users updated even when the app is closed.
+- **In-App Alerts** — Dedicated notifications screen with real-time updates.
+
+### ⭐ Rating System
+- **Passenger Ratings** — Rate your driver after a completed ride.
+- **Skip Option** — Permanently skip rating for a specific ride without being prompted again.
+
+### 👤 User Management
+- **Authentication** — Email/password sign-up and login with Firebase Auth.
+- **Email Verification** — Enforced email verification before accessing the app.
+- **Profile Management** — Edit display name, photo, and personal info.
+- **Trip History** — View all past rides as a host and as a passenger.
+
+### ⚙️ App Management
+- **Force Update** — Prompts users to update when a minimum version requirement is not met.
+- **Settings** — Notification preferences and account management.
+- **Privacy Policy** — In-app privacy policy screen.
 
 ---
 
-## 🧰 Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 |---|---|
-| **Framework** | Flutter 3.10+ (Dart 3.0+) |
-| **Auth** | Firebase Authentication (email/password) |
-| **Database** | Cloud Firestore (real-time sync, offline persistence) |
-| **Notifications** | `flutter_local_notifications` for local push |
-| **Typography** | Google Fonts — Plus Jakarta Sans, Inter |
-| **Design** | Material 3 with custom theme tokens |
+| **Framework** | Flutter (Dart) |
+| **Backend / Database** | Firebase Firestore |
+| **Authentication** | Firebase Auth |
+| **Push Notifications** | Firebase Cloud Messaging (FCM) |
+| **Web Hosting** | Firebase Hosting |
+| **Maps** | Google Maps Flutter / Maps JavaScript API |
+| **Places Autocomplete** | Google Maps JS Places API (web) / Places REST API (mobile) |
+| **Routing & Distance** | Google Routes API |
+| **Geocoding** | Google Maps JS Geocoder (web) / `geocoding` package (mobile) |
+| **Fonts** | Google Fonts — Plus Jakarta Sans |
+| **State Management** | Flutter built-in (`setState`, `StreamBuilder`) |
+| **Environment Config** | `flutter_dotenv` |
+
+---
+
+## 📂 Project Structure
+
+```
+lib/
+├── config/          # App configuration & API endpoints
+├── models/          # Data models (Ride, User, Group, etc.)
+├── screens/         # All app screens
+│   ├── home_screen.dart
+│   ├── offer_ride_screen.dart
+│   ├── available_rides.dart
+│   ├── group_rides_screen.dart
+│   ├── chat_screen.dart
+│   ├── ongoing_ride_screen.dart
+│   ├── track_ride_screen.dart
+│   └── ...
+├── services/        # Business logic & API services
+│   ├── auth_service.dart
+│   ├── firestore_service.dart
+│   ├── places_service.dart
+│   ├── routes_service.dart
+│   ├── location_service.dart
+│   └── ...
+└── widgets/         # Reusable UI components
+    ├── map_location_picker.dart
+    └── ...
+
+web/
+├── index.html       # Web entry point with Maps JS SDK
+├── favicon.png      # Browser tab icon
+└── icons/           # PWA icons
+
+assets/
+└── images/          # App logo and images
+```
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-
-- Flutter SDK `≥ 3.10`
-- A Firebase project with **Auth** and **Firestore** enabled
-- Android Studio / Xcode for emulators
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.x)
+- [Firebase CLI](https://firebase.google.com/docs/cli)
+- A Google Cloud project with the following APIs enabled:
+  - Maps JavaScript API
+  - Maps SDK for Android / iOS
+  - Places API
+  - Routes API
+  - Geocoding API
 
 ### Setup
 
+**1. Clone the repository**
+
 ```bash
-# 1. Clone the repository
 git clone https://github.com/0-Lucifer/rydenf.git
 cd rydenf
+```
 
-# 2. Install dependencies
+**2. Create a `.env` file** in the project root:
+
+```env
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
+
+**3. Configure Firebase**
+
+- Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
+- Run `flutterfire configure` to generate `lib/firebase_options.dart`
+
+**4. Install dependencies**
+
+```bash
 flutter pub get
+```
 
-# 3. Configure Firebase (if not already set up)
-#    Place your google-services.json (Android) and GoogleService-Info.plist (iOS)
-#    Or use FlutterFire CLI:
-dart pub global activate flutterfire_cli
-flutterfire configure
+**5. Run the app**
 
-# 4. Run the app
+```bash
+# Mobile
 flutter run
+
+# Web
+flutter run -d chrome
 ```
 
-### Firestore Rules (recommended starter)
+### Build & Deploy Web
 
-```js
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
-    }
-    match /rides/{rideId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-    match /ride_requests/{requestId} {
-      allow read, write: if request.auth != null;
-    }
-    match /group_rides/{rideId} {
-      allow read, write: if request.auth != null;
-    }
-    match /group_ride_requests/{requestId} {
-      allow read, write: if request.auth != null;
-    }
-    match /notifications/{notifId} {
-      allow read, write: if request.auth != null;
-    }
-    match /chat_rooms/{roomId} {
-      allow read, write: if request.auth != null;
-      match /messages/{messageId} {
-        allow read, write: if request.auth != null;
-      }
-    }
-  }
-}
+```bash
+flutter build web --release
+firebase deploy --only hosting
 ```
 
 ---
 
-## 📁 Firestore Collections
+## 📱 Supported Platforms
 
-| Collection | Purpose |
+| Platform | Status |
 |---|---|
-| `users` | User profiles (name, email, university, gender, avatar) |
-| `rides` | Published rides with route, vehicle, pricing, seat info |
-| `ride_requests` | Seat requests (pending → accepted / rejected) |
-| `group_rides` | Group rides with host, seats, status, auto-expiry |
-| `group_ride_requests` | Join requests for group rides |
-| `chat_rooms` | 1:1 and group chat metadata with participant tracking |
-| `chat_rooms/{id}/messages` | Individual chat messages with delivery status |
-| `notifications` | In-app notifications with type, read status, timestamps |
+| Android | ✅ Supported |
+| iOS | ✅ Supported |
+| Web (PWA) | ✅ Supported |
 
 ---
 
-<!-- ## 🤝 Contributing
+## 🔮 Future Plans
 
-Contributions are welcome! Please follow these steps:
+- [ ] **In-App Payments** — Integrate a payment gateway (e.g., bKash / Stripe) for cashless fare collection.
+- [ ] **Ride Scheduling** — Allow users to schedule rides in advance with calendar integration.
+- [ ] **Driver Verification** — KYC-style ID and license verification for ride hosts.
+- [ ] **Women-Only Rides** — A filter for female passengers to find female-hosted rides.
+- [ ] **SOS / Emergency Button** — One-tap emergency alert with live location sharing to trusted contacts.
+- [ ] **AI Route Suggestions** — Suggest optimal pickup points and routes based on traffic and demand.
+- [ ] **Carbon Footprint Tracker** — Show users how much CO₂ they've saved by sharing rides.
+- [ ] **Multi-Stop Rides** — Support for rides with multiple pickup/dropoff points along a route.
+- [ ] **Recurring Ride Schedule** — Set repeating daily/weekly rides for regular commuters.
+- [ ] **Play Store & App Store Release** — Official public app store listings.
 
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request -->
+---
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome. Feel free to open an issue or submit a pull request.
+
+---
 
 ## 📄 License
 
-Distributed under the **MIT License**. See `LICENSE` for details.
+This project is private and not licensed for redistribution.
 
 ---
 
-<div align="center">
-
-**Built with ❤️ using Flutter & Firebase**
-
-_Ryden — Because every ride is better when shared._
-
-</div>
+<p align="center">Built with ❤️ using Flutter & Firebase</p>
