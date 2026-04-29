@@ -199,7 +199,6 @@ firebase deploy --only hosting
 
 ## 🔮 Future Plans
 
-- [ ] **In-App Payments** — Integrate a payment gateway (e.g., bKash / Stripe) for cashless fare collection.
 - [ ] **Ride Scheduling** — Allow users to schedule rides in advance with calendar integration.
 - [ ] **Driver Verification** — KYC-style ID and license verification for ride hosts.
 - [ ] **Women-Only Rides** — A filter for female passengers to find female-hosted rides.
@@ -208,7 +207,6 @@ firebase deploy --only hosting
 - [ ] **Carbon Footprint Tracker** — Show users how much CO₂ they've saved by sharing rides.
 - [ ] **Multi-Stop Rides** — Support for rides with multiple pickup/dropoff points along a route.
 - [ ] **Recurring Ride Schedule** — Set repeating daily/weekly rides for regular commuters.
-- [ ] **Play Store & App Store Release** — Official public app store listings.
 
 ---
 
