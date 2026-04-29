@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -135,14 +136,18 @@ class LocalNotificationService {
     }
   }
 
-  /// Show a pop-up notification (heads-up, like SMS)
+  // ─── Ryden brand color (0xFF2E7CF6) as an Android Color int ───
+  static const int _rydenBlue = 0xFF2E7CF6;
+
+  /// Show a polished ride/activity notification (heads-up, BigText style)
   Future<void> show({
     required String title,
     required String body,
-    String channelId = 'ryden_activity',
+    String channelId = 'ryden_activity_v3',
     String channelName = 'Ride Activity',
   }) async {
-    if (kIsWeb) return; // Not supported on web
+    if (kIsWeb) return;
+
     final androidDetails = AndroidNotificationDetails(
       channelId,
       channelName,
@@ -150,13 +155,30 @@ class LocalNotificationService {
       importance: Importance.max,
       priority: Priority.max,
       showWhen: true,
+      // Monochrome icon for status-bar + shade, tinted with brand color
       icon: '@mipmap/ic_launcher',
-      // Pop-up style: full-screen intent behavior for heads-up
+      color: const Color(_rydenBlue),
+      colorized: false,
+      // Branded sub-text beneath the app name
+      subText: 'Ryden',
+      // Expanded view: full body text without truncation
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: title,
+        summaryText: 'Ryden',
+      ),
+      // Pop-up style
       fullScreenIntent: true,
       playSound: true,
+      sound: const RawResourceAndroidNotificationSound('ryden_alert'),
       enableVibration: true,
-      vibrationPattern: Int64List.fromList([0, 300, 200, 300]),
+      vibrationPattern: Int64List.fromList([0, 250, 150, 250]),
       ticker: title,
+      // LED indicator — Ryden blue
+      enableLights: true,
+      ledColor: const Color(_rydenBlue),
+      ledOnMs: 800,
+      ledOffMs: 400,
       category: AndroidNotificationCategory.message,
       visibility: NotificationVisibility.public,
     );
@@ -165,19 +187,76 @@ class LocalNotificationService {
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      sound: 'ryden_alert.wav',
       interruptionLevel: InterruptionLevel.timeSensitive,
-    );
-
-    final details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
     );
 
     await _plugin.show(
       id: _notificationId++,
       title: title,
       body: body,
-      notificationDetails: details,
+      notificationDetails: NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      ),
+    );
+  }
+
+  /// Show a polished chat-message notification
+  Future<void> showChat({
+    required String senderName,
+    required String message,
+    bool isGroup = false,
+  }) async {
+    if (kIsWeb) return;
+
+    final chatTitle = isGroup ? '💬 $senderName' : '💬 $senderName';
+
+    final androidDetails = AndroidNotificationDetails(
+      'ryden_chat_v3',
+      'Chat Messages',
+      channelDescription: 'New messages from your ride chats',
+      importance: Importance.max,
+      priority: Priority.max,
+      showWhen: true,
+      icon: '@mipmap/ic_launcher',
+      color: const Color(_rydenBlue),
+      subText: isGroup ? 'Group Chat' : 'Chat',
+      styleInformation: BigTextStyleInformation(
+        message,
+        contentTitle: chatTitle,
+        summaryText: isGroup ? 'Group Chat' : 'Direct Message',
+      ),
+      fullScreenIntent: true,
+      playSound: true,
+      sound: const RawResourceAndroidNotificationSound('ryden_alert'),
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 200, 100, 200]),
+      ticker: '$senderName: $message',
+      enableLights: true,
+      ledColor: const Color(_rydenBlue),
+      ledOnMs: 800,
+      ledOffMs: 400,
+      category: AndroidNotificationCategory.message,
+      visibility: NotificationVisibility.public,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      sound: 'ryden_alert.wav',
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+
+    await _plugin.show(
+      id: _notificationId++,
+      title: chatTitle,
+      body: message,
+      notificationDetails: NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      ),
     );
   }
 
@@ -238,12 +317,7 @@ class LocalNotificationService {
             final title = data['title'] as String? ?? '';
             final body = data['body'] as String? ?? '';
             if (title.isNotEmpty) {
-              show(
-                title: title,
-                body: body,
-                channelId: 'ryden_activity',
-                channelName: 'Ride Activity',
-              );
+              show(title: title, body: body);
             }
           }
         }
@@ -316,11 +390,10 @@ class LocalNotificationService {
           }
         }
 
-        show(
-          title: '💬 $senderName',
-          body: lastMessage,
-          channelId: 'ryden_chat',
-          channelName: 'Chat Messages',
+        showChat(
+          senderName: senderName,
+          message: lastMessage,
+          isGroup: isGroup,
         );
       }
     }, onError: (error) {

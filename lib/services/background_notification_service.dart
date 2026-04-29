@@ -121,6 +121,9 @@ Future<void> _onStart(ServiceInstance service) async {
   }
 }
 
+/// Ryden brand color
+const int _rydenBlue = 0xFF2E7CF6;
+
 /// Start Firestore listeners for notifications and chats
 void _startListeners(
   ServiceInstance service,
@@ -175,7 +178,7 @@ void _startListeners(
           final title = data['title'] as String? ?? '';
           final body = data['body'] as String? ?? '';
           if (title.isNotEmpty) {
-            _showNotification(plugin, notificationId++, title, body, 'ryden_activity', 'Ride Activity');
+            _showRideNotification(plugin, notificationId++, title, body);
           }
         }
       }
@@ -258,34 +261,45 @@ void _startListeners(
         }
       }
 
-      _showNotification(plugin, notificationId++, '💬 $senderName', lastMessage, 'ryden_chat', 'Chat Messages');
+      _showChatNotification(plugin, notificationId++, senderName, lastMessage, isGroup);
     }
   }, onError: (error) {
     // Silently handle errors
   });
 }
 
-/// Show a heads-up notification
-Future<void> _showNotification(
+/// Show a polished ride/activity notification (BigText, brand color, LED)
+Future<void> _showRideNotification(
   FlutterLocalNotificationsPlugin plugin,
   int id,
   String title,
   String body,
-  String channelId,
-  String channelName,
 ) async {
   final androidDetails = AndroidNotificationDetails(
-    channelId,
-    channelName,
-    channelDescription: 'Ride and chat alerts',
+    'ryden_activity_v3',
+    'Ride Activity',
+    channelDescription: 'Ride requests, approvals, and activity alerts',
     importance: Importance.max,
     priority: Priority.max,
     showWhen: true,
     icon: '@mipmap/ic_launcher',
+    color: const Color(_rydenBlue),
+    colorized: false,
+    subText: 'Ryden',
+    styleInformation: BigTextStyleInformation(
+      body,
+      contentTitle: title,
+      summaryText: 'Ryden',
+    ),
     fullScreenIntent: true,
     playSound: true,
+    sound: const RawResourceAndroidNotificationSound('ryden_alert'),
     enableVibration: true,
-    vibrationPattern: Int64List.fromList([0, 300, 200, 300]),
+    vibrationPattern: Int64List.fromList([0, 250, 150, 250]),
+    enableLights: true,
+    ledColor: const Color(_rydenBlue),
+    ledOnMs: 800,
+    ledOffMs: 400,
     category: AndroidNotificationCategory.message,
     visibility: NotificationVisibility.public,
   );
@@ -294,6 +308,7 @@ Future<void> _showNotification(
     presentAlert: true,
     presentBadge: true,
     presentSound: true,
+    sound: 'ryden_alert.wav',
   );
 
   await plugin.show(
@@ -306,3 +321,61 @@ Future<void> _showNotification(
     ),
   );
 }
+
+/// Show a polished chat notification
+Future<void> _showChatNotification(
+  FlutterLocalNotificationsPlugin plugin,
+  int id,
+  String senderName,
+  String message,
+  bool isGroup,
+) async {
+  final chatTitle = '💬 $senderName';
+
+  final androidDetails = AndroidNotificationDetails(
+    'ryden_chat_v3',
+    'Chat Messages',
+    channelDescription: 'New messages from your ride chats',
+    importance: Importance.max,
+    priority: Priority.max,
+    showWhen: true,
+    icon: '@mipmap/ic_launcher',
+    color: const Color(_rydenBlue),
+    subText: isGroup ? 'Group Chat' : 'Chat',
+    styleInformation: BigTextStyleInformation(
+      message,
+      contentTitle: chatTitle,
+      summaryText: isGroup ? 'Group Chat' : 'Direct Message',
+    ),
+    fullScreenIntent: true,
+    playSound: true,
+    sound: const RawResourceAndroidNotificationSound('ryden_alert'),
+    enableVibration: true,
+    vibrationPattern: Int64List.fromList([0, 200, 100, 200]),
+    ticker: '$senderName: $message',
+    enableLights: true,
+    ledColor: const Color(_rydenBlue),
+    ledOnMs: 800,
+    ledOffMs: 400,
+    category: AndroidNotificationCategory.message,
+    visibility: NotificationVisibility.public,
+  );
+
+  const iosDetails = DarwinNotificationDetails(
+    presentAlert: true,
+    presentBadge: true,
+    presentSound: true,
+    sound: 'ryden_alert.wav',
+  );
+
+  await plugin.show(
+    id: id,
+    title: chatTitle,
+    body: message,
+    notificationDetails: NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    ),
+  );
+}
+
