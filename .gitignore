@@ -60,4 +60,4 @@ ios/Runner/Secrets.xcconfig
 !ios/Runner/Secrets.xcconfig.example
 
 # Firebase config (contains API keys)
-lib/firebase_options.dart
+
