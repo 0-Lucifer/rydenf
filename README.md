@@ -222,4 +222,4 @@ This project is private and not licensed for redistribution.
 
 ---
 
-<p align="center">Built with ❤️ using Flutter & Firebase</p>
+<p align="center">Built with care for our university peers using Flutter & Firebase</p>
