@@ -289,81 +289,71 @@ class _PremiumTripCard extends StatelessWidget {
           )
         ],
       ),
-      child: Stack(
-        children: [
-          // Floating Status Badge
-          Positioned(
-            top: 16,
-            right: 16,
-            child: _StatusBadge(label: status.label, color: status.color),
-          ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(24),
-              onTap: () {
-                if (ride.id == null) return;
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => ride.status == 'in_progress' ? OngoingRideScreen(rideId: ride.id!) : RideDetailScreen(rideId: ride.id!),
-                ));
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () {
+            if (ride.id == null) return;
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => ride.status == 'in_progress' ? OngoingRideScreen(rideId: ride.id!) : RideDetailScreen(rideId: ride.id!),
+            ));
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 8), // Room for badge
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    _VehicleIcon(type: ride.vehicleType),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildJourneyTimeline(isDark),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _VehicleIcon(type: ride.vehicleType),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildJourneyTimeline(isDark),
+                        _StatusBadge(label: status.label, color: status.color),
+                        const SizedBox(height: 12),
+                        Text(
+                          "৳${ride.pricePerSeat.toInt()}",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 24, fontWeight: FontWeight.w900,
+                            color: _TripsScreenState.kAccent, letterSpacing: -0.5,
+                          ),
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const SizedBox(height: 24), // Offset for badge above
-                            Text(
-                              "৳${ride.pricePerSeat.toInt()}",
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 24, fontWeight: FontWeight.w900,
-                                color: _TripsScreenState.kAccent, letterSpacing: -0.5,
-                              ),
-                            ),
-                            Text(
-                              "per seat",
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 10, fontWeight: FontWeight.w700, color: _TripsScreenState.kSecondary,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          "per seat",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10, fontWeight: FontWeight.w700, color: _TripsScreenState.kSecondary,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _StatChip(Icons.calendar_today_rounded, dateStr, isDark),
-                          _StatChip(Icons.access_time_rounded, timeStr, isDark),
-                          _StatChip(Icons.people_alt_rounded, "${ride.seatsAvailable}/${ride.seatsTotal}", isDark),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _StatChip(Icons.calendar_today_rounded, dateStr, isDark),
+                      _StatChip(Icons.access_time_rounded, timeStr, isDark),
+                      _StatChip(Icons.people_alt_rounded, "${ride.seatsAvailable}/${ride.seatsTotal}", isDark),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
