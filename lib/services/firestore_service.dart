@@ -1428,6 +1428,60 @@ class FirestoreService {
     }
   }
 
+  /// Stream a single chat room document for real-time status updates
+  static Stream<ChatRoom?> getChatRoomStream(String chatRoomId) {
+    return _db
+        .collection('chat_rooms')
+        .doc(chatRoomId)
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists || doc.data() == null) return null;
+          return ChatRoom.fromMap(doc.data()!, doc.id);
+        })
+        .handleError((error) {
+          print('[FirestoreService] getChatRoomStream error: $error');
+          return null;
+        });
+  }
+
+  /// Stream the current user's request status for a regular ride (real-time)
+  static Stream<String> getUserRequestStatusStreamForRegularRide(String rideId) {
+    if (_uid == null) return Stream.value('none');
+    return _db
+        .collection('ride_requests')
+        .where('rideId', isEqualTo: rideId)
+        .where('passengerId', isEqualTo: _uid)
+        .limit(1)
+        .snapshots()
+        .map((snapshot) {
+          if (snapshot.docs.isEmpty) return 'none';
+          return snapshot.docs.first.data()['status'] as String? ?? 'none';
+        })
+        .handleError((error) {
+          print('[FirestoreService] getUserRequestStatusStreamForRegularRide error: $error');
+          return 'none';
+        });
+  }
+
+  /// Stream the current user's request status for a group ride (real-time)
+  static Stream<String> getUserRequestStatusStreamForRide(String groupRideId) {
+    if (_uid == null) return Stream.value('none');
+    return _db
+        .collection('group_ride_requests')
+        .where('groupRideId', isEqualTo: groupRideId)
+        .where('passengerId', isEqualTo: _uid)
+        .limit(1)
+        .snapshots()
+        .map((snapshot) {
+          if (snapshot.docs.isEmpty) return 'none';
+          return snapshot.docs.first.data()['status'] as String? ?? 'none';
+        })
+        .handleError((error) {
+          print('[FirestoreService] getUserRequestStatusStreamForRide error: $error');
+          return 'none';
+        });
+  }
+
   /// Create or get the group chat room for a group ride
   static Future<ChatRoom?> createOrGetGroupChat(String groupRideId) async {
     if (_uid == null) return null;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -42,6 +43,7 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
   bool _isRequesting = false;
   String _requestStatus = 'none'; // 'none', 'pending', 'accepted', 'rejected'
   bool _isLoadingStatus = true;
+  StreamSubscription<String>? _requestStatusSub;
 
   double? _hostRating;
   int _hostTotalRatings = 0;
@@ -54,10 +56,16 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
     super.initState();
     _fetchHostRating();
     if (!_isHost) {
-      _loadRequestStatus();
+      _listenRequestStatus();
     } else {
       _isLoadingStatus = false;
     }
+  }
+
+  @override
+  void dispose() {
+    _requestStatusSub?.cancel();
+    super.dispose();
   }
 
   void _fetchHostRating() async {
@@ -70,10 +78,13 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
     }
   }
 
-  void _loadRequestStatus() async {
+  void _listenRequestStatus() {
     if (widget.ride.id == null) { setState(() => _isLoadingStatus = false); return; }
-    final status = await FirestoreService.getUserRequestStatusForRide(widget.ride.id!);
-    if (mounted) setState(() { _requestStatus = status; _isLoadingStatus = false; });
+    _requestStatusSub = FirestoreService
+        .getUserRequestStatusStreamForRide(widget.ride.id!)
+        .listen((status) {
+      if (mounted) setState(() { _requestStatus = status; _isLoadingStatus = false; });
+    });
   }
 
   void _handleJoinRequest() async {

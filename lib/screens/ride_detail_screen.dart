@@ -39,6 +39,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   bool _cancelWindowActive = false;
   Timer? _cancelTimer;
   String? get _currentUid => AuthService.currentUser?.uid;
+  StreamSubscription<String>? _requestStatusSub;
 
   double? _driverRating;
   int _driverTotalRatings = 0;
@@ -46,12 +47,13 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadRequestStatus();
+    _listenRequestStatus();
   }
 
   @override
   void dispose() {
     _cancelTimer?.cancel();
+    _requestStatusSub?.cancel();
     super.dispose();
   }
 
@@ -65,9 +67,12 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     }
   }
 
-  void _loadRequestStatus() async {
-    final status = await FirestoreService.getUserRequestStatusForRegularRide(widget.rideId);
-    if (mounted) setState(() { _requestStatus = status; _isLoadingStatus = false; });
+  void _listenRequestStatus() {
+    _requestStatusSub = FirestoreService
+        .getUserRequestStatusStreamForRegularRide(widget.rideId)
+        .listen((status) {
+      if (mounted) setState(() { _requestStatus = status; _isLoadingStatus = false; });
+    });
   }
 
   @override

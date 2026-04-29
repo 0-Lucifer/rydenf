@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,6 +27,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   // Optimistic messages shown instantly before Firestore confirms
   final List<ChatMessage> _optimisticMessages = [];
 
+  // Live room data — updated in real-time so status changes reflect instantly
+  late ChatRoom _liveRoom;
+  StreamSubscription<ChatRoom?>? _roomSub;
+
   static const Color kPrimary = Color(0xFF2E7CF6);
   static const Color kDark = Color(0xFF0F172A);
   static const Color kMuted = Color(0xFF64748B);
@@ -36,6 +41,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _liveRoom = widget.room;
     WidgetsBinding.instance.addObserver(this);
     // Suppress ALL chat notifications while viewing this chat
     LocalNotificationService.instance.setActiveChatRoom(widget.room.id);
@@ -43,11 +49,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (widget.room.id != null) {
       FirestoreService.markMessagesDelivered(widget.room.id!);
       FirestoreService.markMessagesSeen(widget.room.id!);
+      // Listen for real-time room changes (e.g. status pending → active)
+      _roomSub = FirestoreService.getChatRoomStream(widget.room.id!).listen((room) {
+        if (room != null && mounted) {
+          setState(() => _liveRoom = room);
+        }
+      });
     }
   }
 
   @override
   void dispose() {
+    _roomSub?.cancel();
     LocalNotificationService.instance.setActiveChatRoom(null);
     WidgetsBinding.instance.removeObserver(this);
     _messageController.dispose();
@@ -106,26 +119,26 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   String get _chatTitle {
-    if (widget.room.type == 'group') {
-      return widget.room.groupTitle ?? 'Group Chat';
+    if (_liveRoom.type == 'group') {
+      return _liveRoom.groupTitle ?? 'Group Chat';
     }
-    for (final entry in widget.room.participantNames.entries) {
+    for (final entry in _liveRoom.participantNames.entries) {
       if (entry.key != _myUid) return entry.value;
     }
     return 'Chat';
   }
 
   String get _chatSubtitle {
-    if (widget.room.type == 'group') {
-      return '${widget.room.participants.length} members';
+    if (_liveRoom.type == 'group') {
+      return '${_liveRoom.participants.length} members';
     }
     return 'Personal chat';
   }
 
   void _showGroupMembers() {
-    final creatorId = widget.room.requesterId ?? widget.room.participants.first;
+    final creatorId = _liveRoom.requesterId ?? _liveRoom.participants.first;
     final isCreator = _myUid == creatorId;
-    final members = widget.room.participantNames.entries.toList();
+    final members = _liveRoom.participantNames.entries.toList();
 
     showModalBottomSheet(
       context: context,
@@ -310,7 +323,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final remaining = widget.room.expiresAt.difference(DateTime.now());
+    final remaining = _liveRoom.expiresAt.difference(DateTime.now());
     final expiryText = remaining.isNegative
         ? 'Expired'
         : remaining.inHours > 0
@@ -339,8 +352,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   GestureDetector(
                     onTap: () {
                       // For personal chats, show the other person's profile
-                      if (widget.room.type == 'personal') {
-                        final otherId = widget.room.participants.firstWhere(
+                      if (_liveRoom.type == 'personal') {
+                        final otherId = _liveRoom.participants.firstWhere(
                           (id) => id != _myUid,
                           orElse: () => '',
                         );
@@ -352,7 +365,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       height: 42,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: widget.room.type == 'group'
+                          colors: _liveRoom.type == 'group'
                               ? [const Color(0xFF8B5CF6), const Color(0xFFA78BFA)]
                               : [kPrimary, const Color(0xFF60A5FA)],
                           begin: Alignment.topLeft,
@@ -361,7 +374,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Center(
-                        child: widget.room.type == 'group'
+                        child: _liveRoom.type == 'group'
                             ? const Icon(Icons.groups_rounded, color: Colors.white, size: 20)
                             : Text(
                                 _chatTitle.isNotEmpty ? _chatTitle[0].toUpperCase() : '?',
@@ -417,7 +430,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
-                  if (widget.room.type == 'group')
+                  if (_liveRoom.type == 'group')
                     GestureDetector(
                       onTap: _showGroupMembers,
                       child: Container(
@@ -430,7 +443,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '${widget.room.participants.length}',
+                              '${_liveRoom.participants.length}',
                               style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w900, fontSize: 14, color: const Color(0xFF8B5CF6)),
                             ),
                             const SizedBox(width: 2),
@@ -449,7 +462,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       body: Column(
         children: [
           // Pending banner
-          if (widget.room.status == 'pending' && widget.room.requesterId == _myUid)
+          if (_liveRoom.status == 'pending' && _liveRoom.requesterId == _myUid)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -532,7 +545,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     final msgIndex = allMessages.length - 1 - index;
                     final msg = allMessages[msgIndex];
                     final isMe = msg.senderId == _myUid;
-                    final showName = widget.room.type == 'group' && !isMe;
+                    final showName = _liveRoom.type == 'group' && !isMe;
 
                     // Date separator check
                     bool showDate = false;
@@ -594,8 +607,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildPremiumInput() {
-    final canSend = widget.room.status == 'active' ||
-        (widget.room.status == 'pending' && widget.room.requesterId == _myUid);
+    final canSend = _liveRoom.status == 'active' ||
+        (_liveRoom.status == 'pending' && _liveRoom.requesterId == _myUid);
 
     return Container(
       padding: EdgeInsets.fromLTRB(12, 10, 8, MediaQuery.of(context).padding.bottom + 10),
