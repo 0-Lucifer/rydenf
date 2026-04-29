@@ -28,7 +28,7 @@ class BackgroundNotificationService {
         autoStartOnBoot: true,
         foregroundServiceNotificationId: 888,
         initialNotificationTitle: 'Ryden',
-        initialNotificationContent: 'Looking for rides',
+        initialNotificationContent: 'Your Location is Secured',
         foregroundServiceTypes: [AndroidForegroundType.dataSync],
       ),
       iosConfiguration: IosConfiguration(
