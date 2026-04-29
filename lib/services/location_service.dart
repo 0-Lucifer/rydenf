@@ -19,8 +19,8 @@ class LocationService {
     // Check if location services are enabled
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      // Prompt user to enable location services
-      await Geolocator.openLocationSettings();
+      // openLocationSettings is not supported on web
+      if (!kIsWeb) await Geolocator.openLocationSettings();
       return false;
     }
 
@@ -41,10 +41,10 @@ class LocationService {
 
   /// Get current GPS position.
   static Future<Position?> getCurrentPosition() async {
-    final hasPermission = await requestPermission();
-    if (!hasPermission) return null;
-
     try {
+      final hasPermission = await requestPermission();
+      if (!hasPermission) return null;
+
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,

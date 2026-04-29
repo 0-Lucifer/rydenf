@@ -1,14 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart' as geo;
-import 'package:http/http.dart' as http;
-import '../config/app_config.dart';
 import '../services/location_service.dart';
 import '../services/places_service.dart';
+import 'geocoder_stub.dart' if (dart.library.js) 'geocoder_web.dart';
 
 /// A full-screen map picker inspired by Uber. 
 /// It keeps the pin fixed in the center while the user moves the map around.
@@ -71,7 +69,9 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     _currentCenter = widget.initialPosition ?? _defaultCenter;
     // Try GPS on launch if no initial position
     if (widget.initialPosition == null) {
-      _goToMyLocation(animate: false);
+      _goToMyLocation(animate: false).catchError((e) {
+        debugPrint('[MapLocationPicker] location init error: $e');
+      });
     } else {
       _reverseGeocode(_currentCenter);
     }
@@ -87,27 +87,18 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
 
   // Takes map coordinates and turns them into a readable address string
   Future<void> _reverseGeocode(LatLng pos) async {
+    if (!mounted) return;
     setState(() => _isResolvingAddress = true);
     try {
       if (kIsWeb) {
-        // geocoding package doesn't support web — use Geocoding REST API instead
-        final url = Uri.parse(
-          'https://maps.googleapis.com/maps/api/geocode/json'
-          '?latlng=${pos.latitude},${pos.longitude}'
-          '&key=${AppConfig.googleMapsApiKey}',
-        );
-        final response = await http.get(url);
-        if (response.statusCode == 200 && mounted) {
-          final data = jsonDecode(response.body);
-          final results = data['results'] as List?;
-          if (results != null && results.isNotEmpty) {
-            setState(() {
-              _resolvedAddress =
-                  results[0]['formatted_address'] as String? ?? 'Unknown location';
-            });
-          } else {
-            setState(() => _resolvedAddress = 'Unknown location');
-          }
+        // Use google.maps.Geocoder from the Maps JS SDK already loaded in index.html.
+        // This avoids all REST API key / CORS issues.
+        final address = await geocodeWithMapsJS(pos.latitude, pos.longitude);
+        if (mounted) {
+          setState(() {
+            _resolvedAddress = address ??
+                '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+          });
         }
       } else {
         final placemarks = await geo.placemarkFromCoordinates(
@@ -116,25 +107,44 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
         );
         if (placemarks.isNotEmpty && mounted) {
           final p = placemarks.first;
+          // Build address from most-specific to least-specific fields.
+          // Include extra fallback fields so we never show "Unknown location"
+          // when the geocoder returns a valid placemark.
           final parts = <String>[
             if (p.name != null && p.name!.isNotEmpty && p.name != p.postalCode)
               p.name!,
+            if (p.thoroughfare != null && p.thoroughfare!.isNotEmpty)
+              p.thoroughfare!,
             if (p.subLocality != null && p.subLocality!.isNotEmpty)
               p.subLocality!,
             if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
+            if (p.subAdministrativeArea != null &&
+                p.subAdministrativeArea!.isNotEmpty)
+              p.subAdministrativeArea!,
             if (p.administrativeArea != null &&
                 p.administrativeArea!.isNotEmpty)
               p.administrativeArea!,
+            if (p.country != null && p.country!.isNotEmpty) p.country!,
           ];
           setState(() {
+            // Last resort: show coordinates if every field was empty
+            _resolvedAddress = parts.isNotEmpty
+                ? parts.join(', ')
+                : '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+          });
+        } else if (mounted) {
+          // Geocoder returned zero results — show coordinates instead
+          setState(() {
             _resolvedAddress =
-                parts.isNotEmpty ? parts.join(', ') : 'Unknown location';
+                '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
           });
         }
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[MapLocationPicker] _reverseGeocode error: $e');
       if (mounted) {
-        setState(() => _resolvedAddress = 'Unable to determine address');
+        setState(() => _resolvedAddress =
+            '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}');
       }
     } finally {
       if (mounted) setState(() => _isResolvingAddress = false);
@@ -143,6 +153,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
 
   // Grab the phone's GPS and fly the camera there
   Future<void> _goToMyLocation({bool animate = true}) async {
+    if (!mounted) return;
     setState(() => _isLoadingGps = true);
     final pos = await LocationService.getCurrentPosition();
     if (pos != null && mounted) {
@@ -160,7 +171,9 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
               .moveCamera(CameraUpdate.newLatLngZoom(target, 16));
         }
       }
-      _reverseGeocode(target);
+      _reverseGeocode(target).catchError((e) {
+        debugPrint('[MapLocationPicker] reverseGeocode error: $e');
+      });
     } else {
       if (mounted) setState(() => _isLoadingGps = false);
     }
@@ -225,7 +238,9 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
 
   // Update the text at the bottom when the user stops moving the map
   void _onCameraIdle() {
-    _reverseGeocode(_currentCenter);
+    _reverseGeocode(_currentCenter).catchError((e) {
+      debugPrint('[MapLocationPicker] onCameraIdle reverseGeocode error: $e');
+    });
   }
 
   void _onCameraMove(CameraPosition pos) {
@@ -247,11 +262,11 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
             onMapCreated: (controller) => _mapController = controller,
             onCameraMove: _onCameraMove,
             onCameraIdle: _onCameraIdle,
-            myLocationEnabled: !kIsWeb, // not supported on web
+            myLocationEnabled: !kIsWeb,       // no native location dot on web
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            compassEnabled: false,
+            mapToolbarEnabled: !kIsWeb,       // toolbar doesn't exist in Maps JS SDK
+            compassEnabled: !kIsWeb,          // compass doesn't exist in Maps JS SDK
           ),
 
           // This is the custom pin that stays glued to the center

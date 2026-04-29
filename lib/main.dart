@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -14,47 +17,59 @@ import 'services/firestore_service.dart';
 // import 'scripts/seed_app_config.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables (API keys)
-  await dotenv.load(fileName: '.env');
+      // Load environment variables (API keys)
+      await dotenv.load(fileName: '.env');
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
+      // Cap Firestore offline cache at 100 MB
+      FirebaseFirestore.instance.settings = const Settings(
+        cacheSizeBytes: 104857600,
+        persistenceEnabled: true,
+      );
+
+      // Local notifications and background service are Android/iOS only
+      if (!kIsWeb) {
+        await LocalNotificationService.instance.init();
+        await BackgroundNotificationService.initialize();
+      }
+
+      // Prefetch the primary font family so text renders instantly
+      GoogleFonts.config.allowRuntimeFetching = true;
+      GoogleFonts.plusJakartaSans();
+
+      // Fire-and-forget stale data cleanup once at startup
+      FirestoreService.cleanupAllOldData();
+
+      // Lock orientation for consistent UX (mobile only)
+      if (!kIsWeb) {
+        await SystemChrome.setPreferredOrientations(
+            [DeviceOrientation.portraitUp]);
+      }
+
+      runApp(const RydenApp());
+
+      // Request location permission AFTER first frame renders (mobile only)
+      if (!kIsWeb) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _requestLocationPermission();
+        });
+      }
+    },
+    (error, stack) {
+      // print() is used here (not debugPrint) so output appears in release builds
+      // ignore: avoid_print
+      print('[UNHANDLED ERROR] $error');
+      // ignore: avoid_print
+      print('[STACK] $stack');
+    },
   );
-
-  // Cap Firestore offline cache at 100 MB
-  FirebaseFirestore.instance.settings = const Settings(
-    cacheSizeBytes: 104857600, // 100 MB
-    persistenceEnabled: true,
-  );
-
-  // Local notifications and background service are Android/iOS only
-  if (!kIsWeb) {
-    await LocalNotificationService.instance.init();
-    await BackgroundNotificationService.initialize();
-  }
-
-  // Prefetch the primary font family so text renders instantly
-  GoogleFonts.config.allowRuntimeFetching = true;
-  GoogleFonts.plusJakartaSans();
-
-  // Fire-and-forget stale data cleanup once at startup
-  FirestoreService.cleanupAllOldData();
-
-  // Lock orientation for consistent UX (mobile only)
-  if (!kIsWeb) {
-    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  }
-
-  runApp(const RydenApp());
-
-  // Request location permission AFTER first frame renders (mobile only)
-  if (!kIsWeb) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _requestLocationPermission();
-    });
-  }
 }
 
 /// Request location permission at startup so the OS dialog appears early.
