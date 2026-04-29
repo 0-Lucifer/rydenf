@@ -28,18 +28,30 @@ class FirestoreService {
   static Stream<int>? _unreadNotifStream;
   static Stream<int>? _unreadChatStream;
   static Stream<UserProfile?>? _userProfileStream;
+  static Stream<List<Ride>>? _availableRidesStream;
+  static Stream<List<Ride>>? _userRidesStream;
+  static Stream<Map<String, String>?>? _activeRideInfoStream;
   static String? _cachedProfileUid;
   static String? _cachedNotifUid;
   static String? _cachedChatUid;
+  static String? _cachedAvailableRidesUid;
+  static String? _cachedUserRidesUid;
+  static String? _cachedActiveRideUid;
 
   /// Call on logout to clear all cached streams
   static void clearStreamCaches() {
     _unreadNotifStream = null;
     _unreadChatStream = null;
     _userProfileStream = null;
+    _availableRidesStream = null;
+    _userRidesStream = null;
+    _activeRideInfoStream = null;
     _cachedProfileUid = null;
     _cachedNotifUid = null;
     _cachedChatUid = null;
+    _cachedAvailableRidesUid = null;
+    _cachedUserRidesUid = null;
+    _cachedActiveRideUid = null;
     _profileCache.clear();
   }
 
@@ -177,9 +189,14 @@ class FirestoreService {
     }
   }
 
-  /// Returns all active rides. I do filtering and sorting on the UI side.
+  /// Returns all active rides. Cached broadcast so multiple StreamBuilders
+  /// (home screen list + upcoming rides widget) share a single Firestore listener.
   static Stream<List<Ride>> getAvailableRidesStream() {
-    return _db
+    if (_availableRidesStream != null && _cachedAvailableRidesUid == (_uid ?? '')) {
+      return _availableRidesStream!;
+    }
+    _cachedAvailableRidesUid = _uid ?? '';
+    _availableRidesStream = _db
         .collection('rides')
         .where('status', whereIn: ['active', 'full'])
         .snapshots()
@@ -195,13 +212,19 @@ class FirestoreService {
         .handleError((error) {
           print('[FirestoreService] getAvailableRidesStream error: $error');
           return <Ride>[];
-        });
+        })
+        .asBroadcastStream();
+    return _availableRidesStream!;
   }
 
-  /// Listen to rides I've created
+  /// Listen to rides I've created — cached broadcast to survive widget rebuilds.
   static Stream<List<Ride>> getUserRidesStream() {
     if (_uid == null) return Stream.value([]);
-    return _db
+    if (_userRidesStream != null && _cachedUserRidesUid == _uid) {
+      return _userRidesStream!;
+    }
+    _cachedUserRidesUid = _uid;
+    _userRidesStream = _db
         .collection('rides')
         .where('driverId', isEqualTo: _uid)
         .snapshots()
@@ -215,7 +238,9 @@ class FirestoreService {
         .handleError((error) {
           print('[FirestoreService] getUserRidesStream error: $error');
           return <Ride>[];
-        });
+        })
+        .asBroadcastStream();
+    return _userRidesStream!;
   }
 
   /// Stream a single ride
@@ -693,8 +718,14 @@ class FirestoreService {
   /// Get any active in-progress ride for the current user (regular or group).
   /// Listens to all three sources in parallel so that changes in any one of
   /// them (driver rides, passenger rides, group rides) trigger re-evaluation.
+  /// Cached as a broadcast stream so the home screen never hits the
+  /// "Stream has already been listened to" error on widget rebuild.
   static Stream<Map<String, String>?> getActiveRideInfo() {
     if (_uid == null) return Stream.value(null);
+    if (_activeRideInfoStream != null && _cachedActiveRideUid == _uid) {
+      return _activeRideInfoStream!;
+    }
+    _cachedActiveRideUid = _uid;
 
     late StreamController<Map<String, String>?> controller;
     StreamSubscription? sub1, sub2, sub3;
@@ -795,18 +826,19 @@ class FirestoreService {
       sub1?.cancel();
       sub2?.cancel();
       sub3?.cancel();
-      controller.close();
+      // Invalidate the cache so a fresh stream is created next time
+      _activeRideInfoStream = null;
+      _cachedActiveRideUid = null;
+      if (!controller.isClosed) controller.close();
     }
 
-    // Use a non-broadcast controller with onListen/onCancel so that
-    // Firestore subscriptions start only when the StreamBuilder subscribes,
-    // guaranteeing no events are lost.
-    controller = StreamController<Map<String, String>?>(
+    controller = StreamController<Map<String, String>?>.broadcast(
       onListen: startListening,
       onCancel: stopListening,
     );
 
-    return controller.stream;
+    _activeRideInfoStream = controller.stream;
+    return _activeRideInfoStream!;
   }
 
   // ==========================================

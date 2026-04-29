@@ -520,40 +520,82 @@ class GroupDetailScreen extends StatelessWidget {
   void _showStartDialog(BuildContext context, RideGroup group) {
     showDialog(
       context: context,
+      barrierColor: const Color(0xFF0F172A).withOpacity(0.5),
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Start Ride?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
-        content: Text(
-          "All members will be notified that the ride has started.",
-          style: GoogleFonts.plusJakartaSans(color: kSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("Cancel", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: kSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final result = await FirestoreService.startGroupRide(groupId);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(result.message),
-                  backgroundColor: result.success ? kGreen : kRed,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  margin: const EdgeInsets.all(16),
-                ));
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: Colors.white,
+        contentPadding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+        actionsPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [kGreen.withOpacity(0.2), kGreen.withOpacity(0.05)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.play_circle_rounded, color: kGreen, size: 32),
             ),
-            child: Text("Start", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text('Start Ride?', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: kText)),
+            const SizedBox(height: 8),
+            Text(
+              'All members will be notified that the ride has started.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w500, color: kSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 28),
+            Row(children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text('Not Yet', style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: kSecondary)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [kGreen, const Color(0xFF059669)]),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [BoxShadow(color: kGreen.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: TextButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final result = await FirestoreService.startGroupRide(groupId);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(result.message),
+                            backgroundColor: result.success ? kGreen : kRed,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            margin: const EdgeInsets.all(16),
+                          ));
+                        }
+                      },
+                      style: TextButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                      child: Text('Start', style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ],
+        ),
       ),
     );
   }
@@ -561,40 +603,82 @@ class GroupDetailScreen extends StatelessWidget {
   void _showEndDialog(BuildContext context, RideGroup group) {
     showDialog(
       context: context,
+      barrierColor: const Color(0xFF0F172A).withOpacity(0.5),
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("End Ride?", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
-        content: Text(
-          "The ride will end and the group will be dissolved. Chat will become inactive.",
-          style: GoogleFonts.plusJakartaSans(color: kSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("Cancel", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: kSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final result = await FirestoreService.endGroupRide(groupId);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(result.message),
-                  backgroundColor: result.success ? kGreen : kRed,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  margin: const EdgeInsets.all(16),
-                ));
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kRed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: Colors.white,
+        contentPadding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+        actionsPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFFFEE2E2), const Color(0xFFFECACA).withOpacity(0.5)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.stop_circle_rounded, color: Color(0xFFEF4444), size: 32),
             ),
-            child: Text("End Ride", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text('End Ride?', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: kText)),
+            const SizedBox(height: 8),
+            Text(
+              'The ride will end and the group will be dissolved. Chat will become inactive.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w500, color: kSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 28),
+            Row(children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text('Keep Going', style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: kSecondary)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFDC2626)]),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [BoxShadow(color: const Color(0xFFEF4444).withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: TextButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final result = await FirestoreService.endGroupRide(groupId);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(result.message),
+                            backgroundColor: result.success ? kGreen : kRed,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            margin: const EdgeInsets.all(16),
+                          ));
+                        }
+                      },
+                      style: TextButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                      child: Text('End Ride', style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ],
+        ),
       ),
     );
   }

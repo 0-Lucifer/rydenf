@@ -162,38 +162,81 @@ class _GroupRideDetailsSheetState extends State<GroupRideDetailsSheet> {
     if (widget.ride.id == null) return;
     showDialog(
       context: context,
+      barrierColor: const Color(0xFF0F172A).withOpacity(0.5),
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text('End Group Ride?', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
-        content: Text(
-          'This will end the ride and dissolve the group.',
-          style: GoogleFonts.plusJakartaSans(fontSize: 14, color: Colors.grey[600]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-
-              // Dissolve the group ride
-              setState(() => _isRequesting = true);
-              final result = await FirestoreService.completeGroupRide(widget.ride.id!);
-              if (mounted) {
-                Navigator.pop(context);
-                _showPremiumSnackBar(context, result.message, result.success ? RydenTokens.success : RydenTokens.danger);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: RydenTokens.danger,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: Colors.white,
+        contentPadding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+        actionsPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFFFEE2E2), const Color(0xFFFECACA).withOpacity(0.5)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.stop_circle_rounded, color: Color(0xFFEF4444), size: 32),
             ),
-            child: Text('End Ride', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: Colors.white)),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(
+              'End Group Ride?',
+              style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This will end the ride and dissolve the group.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey[600], height: 1.5),
+            ),
+            const SizedBox(height: 28),
+            Row(children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text('Keep Going', style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.grey[600])),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFDC2626)]),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [BoxShadow(color: const Color(0xFFEF4444).withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: TextButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        setState(() => _isRequesting = true);
+                        final result = await FirestoreService.completeGroupRide(widget.ride.id!);
+                        if (mounted) {
+                          Navigator.pop(context);
+                          _showPremiumSnackBar(context, result.message, result.success ? RydenTokens.success : RydenTokens.danger);
+                        }
+                      },
+                      style: TextButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                      child: Text('End Ride', style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ],
+        ),
       ),
     );
   }
