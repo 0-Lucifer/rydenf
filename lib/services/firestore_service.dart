@@ -11,6 +11,7 @@ import '../models/chat_room_model.dart';
 import '../models/chat_message_model.dart';
 import '../models/rating_model.dart';
 import '../models/group_model.dart';
+import 'package:rxdart/rxdart.dart';
 
 
 class FirestoreService {
@@ -131,7 +132,7 @@ class FirestoreService {
     }).handleError((error) {
       print('[FirestoreService] getUserProfileStream error: $error');
       return null;
-    }).asBroadcastStream();
+    }).shareReplay(maxSize: 1);
     return _userProfileStream!;
   }
 
@@ -213,7 +214,7 @@ class FirestoreService {
           print('[FirestoreService] getAvailableRidesStream error: $error');
           return <Ride>[];
         })
-        .asBroadcastStream();
+        .shareReplay(maxSize: 1);
     return _availableRidesStream!;
   }
 
@@ -239,7 +240,7 @@ class FirestoreService {
           print('[FirestoreService] getUserRidesStream error: $error');
           return <Ride>[];
         })
-        .asBroadcastStream();
+        .shareReplay(maxSize: 1);
     return _userRidesStream!;
   }
 
@@ -727,7 +728,7 @@ class FirestoreService {
     }
     _cachedActiveRideUid = _uid;
 
-    late StreamController<Map<String, String>?> controller;
+    late BehaviorSubject<Map<String, String>?> controller;
     StreamSubscription? sub1, sub2, sub3;
 
     QuerySnapshot<Map<String, dynamic>>? latestDriver;
@@ -832,7 +833,7 @@ class FirestoreService {
       if (!controller.isClosed) controller.close();
     }
 
-    controller = StreamController<Map<String, String>?>.broadcast(
+    controller = BehaviorSubject<Map<String, String>?>.seeded(null,
       onListen: startListening,
       onCancel: stopListening,
     );
@@ -912,7 +913,7 @@ class FirestoreService {
           print('[FirestoreService] getUnreadCount error: $error');
           return 0;
         })
-        .asBroadcastStream();
+        .shareReplay(maxSize: 1);
     return _unreadNotifStream!;
   }
 
@@ -2127,7 +2128,7 @@ class FirestoreService {
           print('[FirestoreService] getUnreadChatCount error: $error');
           return 0;
         })
-        .asBroadcastStream();
+        .shareReplay(maxSize: 1);
     return _unreadChatStream!;
   }
 
