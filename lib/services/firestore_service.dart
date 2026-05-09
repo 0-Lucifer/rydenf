@@ -25,12 +25,19 @@ class FirestoreService {
   static const _profileCacheTTL = Duration(minutes: 5);
   static void clearProfileCache() => _profileCache.clear();
 
-  // Stream caching — avoids creating duplicate Firestore listeners
-  static Stream<int>? _unreadNotifStream;
-  static Stream<int>? _unreadChatStream;
-  static Stream<UserProfile?>? _userProfileStream;
-  static Stream<List<Ride>>? _availableRidesStream;
-  static Stream<List<Ride>>? _userRidesStream;
+  // Stream caching — BehaviorSubjects ensure every Firestore snapshot
+  // event is forwarded to all active listeners in real-time.
+  // Unlike shareReplay, these never serve stale replay buffers.
+  static BehaviorSubject<int>? _unreadNotifSubject;
+  static StreamSubscription? _unreadNotifSub;
+  static BehaviorSubject<int>? _unreadChatSubject;
+  static StreamSubscription? _unreadChatSub;
+  static BehaviorSubject<UserProfile?>? _userProfileSubject;
+  static StreamSubscription? _userProfileSub;
+  static BehaviorSubject<List<Ride>>? _availableRidesSubject;
+  static StreamSubscription? _availableRidesSub;
+  static BehaviorSubject<List<Ride>>? _userRidesSubject;
+  static StreamSubscription? _userRidesSub;
   static Stream<Map<String, String>?>? _activeRideInfoStream;
   static String? _cachedProfileUid;
   static String? _cachedNotifUid;
@@ -41,11 +48,31 @@ class FirestoreService {
 
   /// Call on logout to clear all cached streams
   static void clearStreamCaches() {
-    _unreadNotifStream = null;
-    _unreadChatStream = null;
-    _userProfileStream = null;
-    _availableRidesStream = null;
-    _userRidesStream = null;
+    _unreadNotifSub?.cancel();
+    _unreadNotifSubject?.close();
+    _unreadNotifSubject = null;
+    _unreadNotifSub = null;
+
+    _unreadChatSub?.cancel();
+    _unreadChatSubject?.close();
+    _unreadChatSubject = null;
+    _unreadChatSub = null;
+
+    _userProfileSub?.cancel();
+    _userProfileSubject?.close();
+    _userProfileSubject = null;
+    _userProfileSub = null;
+
+    _availableRidesSub?.cancel();
+    _availableRidesSubject?.close();
+    _availableRidesSubject = null;
+    _availableRidesSub = null;
+
+    _userRidesSub?.cancel();
+    _userRidesSubject?.close();
+    _userRidesSubject = null;
+    _userRidesSub = null;
+
     _activeRideInfoStream = null;
     _cachedProfileUid = null;
     _cachedNotifUid = null;
@@ -121,19 +148,28 @@ class FirestoreService {
 
   static Stream<UserProfile?> getUserProfileStream() {
     if (_uid == null) return Stream.value(null);
-    // Return cached stream if user hasn't changed
-    if (_userProfileStream != null && _cachedProfileUid == _uid) {
-      return _userProfileStream!;
+    // Return cached subject if user hasn't changed
+    if (_userProfileSubject != null && !_userProfileSubject!.isClosed && _cachedProfileUid == _uid) {
+      return _userProfileSubject!.stream;
     }
+    // Tear down previous listener
+    _userProfileSub?.cancel();
+    _userProfileSubject?.close();
     _cachedProfileUid = _uid;
-    _userProfileStream = _db.collection('users').doc(_uid).snapshots().map((doc) {
-      if (!doc.exists || doc.data() == null) return null;
-      return UserProfile.fromMap(doc.data()!);
-    }).handleError((error) {
-      print('[FirestoreService] getUserProfileStream error: $error');
-      return null;
-    }).shareReplay(maxSize: 1);
-    return _userProfileStream!;
+    _userProfileSubject = BehaviorSubject<UserProfile?>();
+    _userProfileSub = _db.collection('users').doc(_uid).snapshots().listen(
+      (doc) {
+        if (!doc.exists || doc.data() == null) {
+          _userProfileSubject?.add(null);
+        } else {
+          _userProfileSubject?.add(UserProfile.fromMap(doc.data()!));
+        }
+      },
+      onError: (error) {
+        print('[FirestoreService] getUserProfileStream error: $error');
+      },
+    );
+    return _userProfileSubject!.stream;
   }
 
   static Future<UserProfile?> getUserProfile(String uid) async {
@@ -190,58 +226,70 @@ class FirestoreService {
     }
   }
 
-  /// Returns all active rides. Cached broadcast so multiple StreamBuilders
-  /// (home screen list + upcoming rides widget) share a single Firestore listener.
+  /// Returns all active rides. Uses a BehaviorSubject so multiple StreamBuilders
+  /// (home screen list + upcoming rides widget) share a single Firestore listener
+  /// and always receive the latest snapshot data in real-time.
   static Stream<List<Ride>> getAvailableRidesStream() {
-    if (_availableRidesStream != null && _cachedAvailableRidesUid == (_uid ?? '')) {
-      return _availableRidesStream!;
+    if (_availableRidesSubject != null && !_availableRidesSubject!.isClosed && _cachedAvailableRidesUid == (_uid ?? '')) {
+      return _availableRidesSubject!.stream;
     }
+    // Tear down previous listener
+    _availableRidesSub?.cancel();
+    _availableRidesSubject?.close();
     _cachedAvailableRidesUid = _uid ?? '';
-    _availableRidesStream = _db
+    _availableRidesSubject = BehaviorSubject<List<Ride>>();
+    _availableRidesSub = _db
         .collection('rides')
         .where('status', whereIn: ['active', 'full'])
         .snapshots()
-        .map((snapshot) {
-          final cutoff = DateTime.now().subtract(const Duration(hours: 24));
-          final rides = snapshot.docs
-              .map((doc) => Ride.fromMap(doc.data(), doc.id))
-              .where((ride) => ride.departureTime.isAfter(cutoff))
-              .toList();
-          rides.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return rides;
-        })
-        .handleError((error) {
-          print('[FirestoreService] getAvailableRidesStream error: $error');
-          return <Ride>[];
-        })
-        .shareReplay(maxSize: 1);
-    return _availableRidesStream!;
+        .listen(
+      (snapshot) {
+        final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+        final rides = snapshot.docs
+            .map((doc) => Ride.fromMap(doc.data(), doc.id))
+            .where((ride) => ride.departureTime.isAfter(cutoff))
+            .toList();
+        rides.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _availableRidesSubject?.add(rides);
+      },
+      onError: (error) {
+        print('[FirestoreService] getAvailableRidesStream error: $error');
+        _availableRidesSubject?.add(<Ride>[]);
+      },
+    );
+    return _availableRidesSubject!.stream;
   }
 
-  /// Listen to rides I've created — cached broadcast to survive widget rebuilds.
+  /// Listen to rides I've created — BehaviorSubject ensures real-time updates
+  /// even after widget rebuilds, and never serves stale cached data.
   static Stream<List<Ride>> getUserRidesStream() {
     if (_uid == null) return Stream.value([]);
-    if (_userRidesStream != null && _cachedUserRidesUid == _uid) {
-      return _userRidesStream!;
+    if (_userRidesSubject != null && !_userRidesSubject!.isClosed && _cachedUserRidesUid == _uid) {
+      return _userRidesSubject!.stream;
     }
+    // Tear down previous listener
+    _userRidesSub?.cancel();
+    _userRidesSubject?.close();
     _cachedUserRidesUid = _uid;
-    _userRidesStream = _db
+    _userRidesSubject = BehaviorSubject<List<Ride>>();
+    _userRidesSub = _db
         .collection('rides')
         .where('driverId', isEqualTo: _uid)
         .snapshots()
-        .map((snapshot) {
-          final rides = snapshot.docs
-              .map((doc) => Ride.fromMap(doc.data(), doc.id))
-              .toList();
-          rides.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return rides;
-        })
-        .handleError((error) {
-          print('[FirestoreService] getUserRidesStream error: $error');
-          return <Ride>[];
-        })
-        .shareReplay(maxSize: 1);
-    return _userRidesStream!;
+        .listen(
+      (snapshot) {
+        final rides = snapshot.docs
+            .map((doc) => Ride.fromMap(doc.data(), doc.id))
+            .toList();
+        rides.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _userRidesSubject?.add(rides);
+      },
+      onError: (error) {
+        print('[FirestoreService] getUserRidesStream error: $error');
+        _userRidesSubject?.add(<Ride>[]);
+      },
+    );
+    return _userRidesSubject!.stream;
   }
 
   /// Stream a single ride
@@ -896,25 +944,32 @@ class FirestoreService {
         );
   }
 
-  /// Stream unread notification count — cached broadcast stream
+  /// Stream unread notification count — BehaviorSubject for real-time updates
   static Stream<int> getUnreadNotificationCount() {
     if (_uid == null) return Stream.value(0);
-    if (_unreadNotifStream != null && _cachedNotifUid == _uid) {
-      return _unreadNotifStream!;
+    if (_unreadNotifSubject != null && !_unreadNotifSubject!.isClosed && _cachedNotifUid == _uid) {
+      return _unreadNotifSubject!.stream;
     }
+    // Tear down previous listener
+    _unreadNotifSub?.cancel();
+    _unreadNotifSubject?.close();
     _cachedNotifUid = _uid;
-    _unreadNotifStream = _db
+    _unreadNotifSubject = BehaviorSubject<int>();
+    _unreadNotifSub = _db
         .collection('notifications')
         .where('userId', isEqualTo: _uid)
         .where('isRead', isEqualTo: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs.length)
-        .handleError((error) {
-          print('[FirestoreService] getUnreadCount error: $error');
-          return 0;
-        })
-        .shareReplay(maxSize: 1);
-    return _unreadNotifStream!;
+        .listen(
+      (snapshot) {
+        _unreadNotifSubject?.add(snapshot.docs.length);
+      },
+      onError: (error) {
+        print('[FirestoreService] getUnreadCount error: $error');
+        _unreadNotifSubject?.add(0);
+      },
+    );
+    return _unreadNotifSubject!.stream;
   }
 
   /// Mark a single notification as read
@@ -2092,44 +2147,48 @@ class FirestoreService {
         });
   }
 
-  /// Get count of unread chat rooms
-  /// Unread chat count — cached broadcast stream
+  /// Get count of unread chat rooms — BehaviorSubject for real-time updates
   static Stream<int> getUnreadChatCount() {
     if (_uid == null) return Stream.value(0);
-    if (_unreadChatStream != null && _cachedChatUid == _uid) {
-      return _unreadChatStream!;
+    if (_unreadChatSubject != null && !_unreadChatSubject!.isClosed && _cachedChatUid == _uid) {
+      return _unreadChatSubject!.stream;
     }
+    // Tear down previous listener
+    _unreadChatSub?.cancel();
+    _unreadChatSubject?.close();
     _cachedChatUid = _uid;
-    _unreadChatStream = _db
+    _unreadChatSubject = BehaviorSubject<int>();
+    _unreadChatSub = _db
         .collection('chat_rooms')
         .where('participants', arrayContains: _uid)
         .snapshots()
-        .map((snapshot) {
-          final now = DateTime.now();
-          int count = 0;
-          for (final doc in snapshot.docs) {
-            final data = doc.data();
-            final status = data['status'] as String? ?? '';
-            final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate() ?? now;
-            if (status == 'closed' || now.isAfter(expiresAt)) continue;
+        .listen(
+      (snapshot) {
+        final now = DateTime.now();
+        int count = 0;
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          final status = data['status'] as String? ?? '';
+          final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate() ?? now;
+          if (status == 'closed' || now.isAfter(expiresAt)) continue;
 
-            final rawLastRead = data['lastReadBy'] as Map<String, dynamic>? ?? {};
-            final lastRead = (rawLastRead[_uid] as Timestamp?)?.toDate();
-            final lastMsgTime = (data['lastMessageTime'] as Timestamp?)?.toDate() ?? DateTime(2000);
-            final lastMsg = data['lastMessage'] as String? ?? '';
+          final rawLastRead = data['lastReadBy'] as Map<String, dynamic>? ?? {};
+          final lastRead = (rawLastRead[_uid] as Timestamp?)?.toDate();
+          final lastMsgTime = (data['lastMessageTime'] as Timestamp?)?.toDate() ?? DateTime(2000);
+          final lastMsg = data['lastMessage'] as String? ?? '';
 
-            if (lastMsg.isNotEmpty && (lastRead == null || lastMsgTime.isAfter(lastRead))) {
-              count++;
-            }
+          if (lastMsg.isNotEmpty && (lastRead == null || lastMsgTime.isAfter(lastRead))) {
+            count++;
           }
-          return count;
-        })
-        .handleError((error) {
-          print('[FirestoreService] getUnreadChatCount error: $error');
-          return 0;
-        })
-        .shareReplay(maxSize: 1);
-    return _unreadChatStream!;
+        }
+        _unreadChatSubject?.add(count);
+      },
+      onError: (error) {
+        print('[FirestoreService] getUnreadChatCount error: $error');
+        _unreadChatSubject?.add(0);
+      },
+    );
+    return _unreadChatSubject!.stream;
   }
 
   /// Delete expired chat rooms — limited to 20 per run to avoid heavy startup
